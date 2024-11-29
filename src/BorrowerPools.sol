@@ -484,6 +484,8 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     }
 
     uint128 normalizedLoanAmount = loanAmount.scaleToWad(pool.parameters.TOKEN_DECIMALS);
+    uint128 normalizedCollateralAmount = (10000 * loanAmount.scaleToWad(pool.parameters.COLLATERAL_TOKEN_DECIMALS)) /
+      pool.parameters.LTV;
     uint128 normalizedEstablishmentFee = normalizedLoanAmount.wadMul(pool.parameters.ESTABLISHMENT_FEE_RATE);
     uint128 normalizedBorrowedAmount = normalizedLoanAmount - normalizedEstablishmentFee;
     if (pool.state.normalizedBorrowedAmount + normalizedLoanAmount > pool.parameters.MAX_BORROWABLE_AMOUNT) {
@@ -523,6 +525,8 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
 
     protocolFees[poolHash] += normalizedEstablishmentFee;
     pool.state.normalizedBorrowedAmount += normalizedLoanAmount;
+    // deposit collateral
+    pool.depositToYieldProvider(_msgSender(), normalizedCollateralAmount);
     pool.parameters.YIELD_PROVIDER.withdraw(
       pool.parameters.UNDERLYING_TOKEN,
       normalizedBorrowedAmount.scaleFromWad(pool.parameters.TOKEN_DECIMALS),
@@ -534,7 +538,14 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
    * @notice Repays a currently outstanding bonds of the given pool.
    **/
   function repay() external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
-    bytes32 poolHash = borrowerAuthorizedPools[_msgSender()];
+    repayFor(_msgSender());
+  }
+
+  /**
+   * @notice Repays a currently outstanding bonds of the given pool for a borrower
+   **/
+  function repayFor(address borrower) public whenNotPaused {
+    bytes32 poolHash = borrowerAuthorizedPools[borrower];
     Types.Pool storage pool = pools[poolHash];
     if (pool.state.defaulted) {
       revert Errors.BP_POOL_DEFAULTED();
@@ -545,6 +556,10 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     bool earlyRepay = pool.state.currentMaturity > block.timestamp;
     if (earlyRepay && !pool.parameters.EARLY_REPAY) {
       revert Errors.BP_EARLY_REPAY_NOT_ACTIVATED();
+    }
+
+    if (block.timestamp < (pool.state.currentMaturity + pool.parameters.REPAYMENT_PERIOD)) {
+      revert Errors.BP_LOAN_ONGOING();
     }
 
     // collectFees should be called before changing pool global state as fee collection depends on it
@@ -570,10 +585,15 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       bondsIssuanceIndexAlreadyIncremented = indexIncremented || bondsIssuanceIndexAlreadyIncremented;
     }
 
+    uint128 normalizedCollateralAmount = (10000 *
+      (normalizedRepayAmount.scaleFromWad(pool.parameters.TOKEN_DECIMALS)).scaleToWad(
+        pool.parameters.COLLATERAL_TOKEN_DECIMALS
+      )) / pool.parameters.LTV;
     uint128 repaymentFees = pool.getRepaymentFees(normalizedRepayAmount);
     normalizedRepayAmount += repaymentFees;
 
     pool.depositToYieldProvider(_msgSender(), normalizedRepayAmount);
+    pool.parameters.YIELD_PROVIDER.withdraw(pool.parameters.COLLATERAL_TOKEN, normalizedCollateralAmount, borrower);
     pool.state.nextLoanMinStart = uint128(block.timestamp) + pool.parameters.COOLDOWN_PERIOD;
 
     pool.state.bondsIssuedQuantity = 0;

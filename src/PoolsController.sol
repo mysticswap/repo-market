@@ -231,6 +231,9 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     pools[params.poolHash].parameters = Types.PoolParameters({
       POOL_HASH: params.poolHash,
       UNDERLYING_TOKEN: params.underlyingToken,
+      COLLATERAL_TOKEN_DECIMALS: IERC20PartialDecimals(params.collateralToken).decimals(),
+      COLLATERAL_TOKEN: params.collateralToken,
+      LTV: params.ltv,
       TOKEN_DECIMALS: IERC20PartialDecimals(params.underlyingToken).decimals(),
       YIELD_PROVIDER: params.yieldProvider,
       MIN_RATE: params.minRate,
