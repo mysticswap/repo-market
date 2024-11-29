@@ -50,6 +50,7 @@ describe('Borrower Pools - Repay', function () {
     liquidityRewardsRate: BigNumber,
     maxBorrowableAmount: BigNumber;
   let poolToken: string;
+  let otherToken: string;
   let mockLendingPool: MockContract;
   const depositAmount: BigNumber = WAD.mul(20); //20 tokens deposited : arbitrary amount for testing purpose
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,6 +69,7 @@ describe('Borrower Pools - Repay', function () {
       testPositionManager,
       governance,
       poolTokenAddress,
+      otherTokenAddress,
     } = await setupTestContracts(deployer, mocks, users);
     BorrowerPools = deployedBorrowerPools;
     poolParameters = await BorrowerPools.getPoolParameters(poolHash);
@@ -83,6 +85,7 @@ describe('Borrower Pools - Repay', function () {
     borrower = testBorrower;
     governanceUser = governance;
     poolToken = poolTokenAddress;
+    otherToken = otherTokenAddress;
     mockLendingPool = mocks.ILendingPool;
     checkPoolState = checkPoolUtil(borrower);
     checkPositionRepartition = checkPositionRepartitionUtil(borrower);
@@ -113,6 +116,8 @@ describe('Borrower Pools - Repay', function () {
       governanceUser.BorrowerPools.createNewPool({
         poolHash: newPoolHash,
         underlyingToken: poolToken,
+        collateralToken: otherToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -134,7 +139,9 @@ describe('Borrower Pools - Repay', function () {
       .withArgs([
         newPoolHash,
         poolToken,
+        otherToken,
         mockLendingPool.address,
+        8000,
         minRateInput,
         maxRateInput,
         rateSpacingInput,

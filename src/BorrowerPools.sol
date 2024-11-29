@@ -73,7 +73,8 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       uint128 bondsQuantity,
       uint128 adjustedPendingAmount,
       uint128 atlendisLiquidityRatio,
-      uint128 accruedFees
+      uint128 accruedFees,
+      uint128 lastFeeDistributionTimestamp
     )
   {
     Types.Tick storage tick = pools[poolHash].ticks[rate];
@@ -83,24 +84,9 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       tick.bondsQuantity,
       tick.adjustedPendingAmount,
       tick.atlendisLiquidityRatio,
-      tick.accruedFees
+      tick.accruedFees,
+      tick.lastFeeDistributionTimestamp
     );
-  }
-
-  /**
-   * @notice Returns the timestamp of the last fee distribution to the tick
-   * @param pool The identifier of the pool pool
-   * @param rate The tick rate from which to get data
-   * @return lastFeeDistributionTimestamp Timestamp of the last fee's distribution to the tick
-   **/
-  function getTickLastUpdate(string calldata pool, uint128 rate)
-    public
-    view
-    override
-    returns (uint128 lastFeeDistributionTimestamp)
-  {
-    Types.Tick storage tick = pools[keccak256(abi.encode(pool))].ticks[rate];
-    return tick.lastFeeDistributionTimestamp;
   }
 
   /**
@@ -558,7 +544,8 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       revert Errors.BP_EARLY_REPAY_NOT_ACTIVATED();
     }
 
-    if (block.timestamp < (pool.state.currentMaturity + pool.parameters.REPAYMENT_PERIOD)) {
+    if (borrower != _msgSender() && block.timestamp < (pool.state.currentMaturity + pool.parameters.REPAYMENT_PERIOD)) {
+      // liquidator cannot liquidate early or during repayment period
       revert Errors.BP_LOAN_ONGOING();
     }
 
@@ -661,19 +648,14 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
   /**
    * @notice Collect yield provider fees as well as liquidity rewards for the target tick
    * @param poolHash The identifier of the pool
+   * @param rate The rate is target tick, rate = 0 means collect entire fees
    **/
-  function collectFeesForTick(bytes32 poolHash, uint128 rate) external override whenNotPaused {
+  function collectFees(bytes32 poolHash, uint128 rate) external override whenNotPaused {
     Types.Pool storage pool = pools[poolHash];
-    pool.collectFees(rate);
-  }
-
-  /**
-   * @notice Collect yield provider fees as well as liquidity rewards for the whole pool
-   * Iterates over all pool initialized ticks
-   * @param poolHash The identifier of the pool
-   **/
-  function collectFees(bytes32 poolHash) external override whenNotPaused {
-    Types.Pool storage pool = pools[poolHash];
-    pool.collectFees();
+    if (rate == 0) {
+      pool.collectFees();
+    } else {
+      pool.collectFees(rate);
+    }
   }
 }

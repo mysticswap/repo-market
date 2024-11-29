@@ -395,21 +395,21 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
   }
 
   // POOL PARAMETERS MANAGEMENT
-  /**
-   * @notice Set the maximum amount of tokens that can be borrowed in the target pool
-   **/
-  function setMaxBorrowableAmount(uint128 maxBorrowableAmount, bytes32 poolHash)
-    external
-    override
-    onlyRole(Roles.GOVERNANCE_ROLE)
-  {
-    if (pools[poolHash].parameters.POOL_HASH != poolHash) {
-      revert Errors.PC_POOL_NOT_ACTIVE();
-    }
-    pools[poolHash].parameters.MAX_BORROWABLE_AMOUNT = maxBorrowableAmount;
+  // /**
+  //  * @notice Set the maximum amount of tokens that can be borrowed in the target pool
+  //  **/
+  // function setMaxBorrowableAmount(uint128 maxBorrowableAmount, bytes32 poolHash)
+  //   external
+  //   override
+  //   onlyRole(Roles.GOVERNANCE_ROLE)
+  // {
+  //   if (pools[poolHash].parameters.POOL_HASH != poolHash) {
+  //     revert Errors.PC_POOL_NOT_ACTIVE();
+  //   }
+  //   pools[poolHash].parameters.MAX_BORROWABLE_AMOUNT = maxBorrowableAmount;
 
-    emit SetMaxBorrowableAmount(maxBorrowableAmount, poolHash);
-  }
+  //   emit SetMaxBorrowableAmount(maxBorrowableAmount, poolHash);
+  // }
 
   /**
    * @notice Set the pool liquidity rewards distribution rate
@@ -427,25 +427,25 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     emit SetLiquidityRewardsDistributionRate(distributionRate, poolHash);
   }
 
-  /**
-   * @notice Set the pool establishment protocol fee rate
-   **/
-  function setEstablishmentFeeRate(uint128 establishmentFeeRate, bytes32 poolHash)
-    external
-    override
-    onlyRole(Roles.GOVERNANCE_ROLE)
-  {
-    if (!pools[poolHash].state.active) {
-      revert Errors.PC_POOL_NOT_ACTIVE();
-    }
-    if (establishmentFeeRate > PoolLogic.WAD) {
-      revert Errors.PC_ESTABLISHMENT_FEES_TOO_HIGH();
-    }
+  // /**
+  //  * @notice Set the pool establishment protocol fee rate
+  //  **/
+  // function setEstablishmentFeeRate(uint128 establishmentFeeRate, bytes32 poolHash)
+  //   external
+  //   override
+  //   onlyRole(Roles.GOVERNANCE_ROLE)
+  // {
+  //   if (!pools[poolHash].state.active) {
+  //     revert Errors.PC_POOL_NOT_ACTIVE();
+  //   }
+  //   if (establishmentFeeRate > PoolLogic.WAD) {
+  //     revert Errors.PC_ESTABLISHMENT_FEES_TOO_HIGH();
+  //   }
 
-    pools[poolHash].parameters.ESTABLISHMENT_FEE_RATE = establishmentFeeRate;
+  //   pools[poolHash].parameters.ESTABLISHMENT_FEE_RATE = establishmentFeeRate;
 
-    emit SetEstablishmentFeeRate(establishmentFeeRate, poolHash);
-  }
+  //   emit SetEstablishmentFeeRate(establishmentFeeRate, poolHash);
+  // }
 
   /**
    * @notice Set the pool repayment protocol fee rate

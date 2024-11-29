@@ -50,6 +50,8 @@ describe('Borrower Pools - Governance functions', function () {
       user1.BorrowerPools.createNewPool({
         poolHash: poolHash,
         underlyingToken: poolToken,
+        collateralToken: otherToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -80,6 +82,8 @@ describe('Borrower Pools - Governance functions', function () {
       governanceUser.BorrowerPools.createNewPool({
         poolHash: newPoolHash,
         underlyingToken: otherToken,
+        collateralToken: poolToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -103,6 +107,8 @@ describe('Borrower Pools - Governance functions', function () {
       governanceUser.BorrowerPools.createNewPool({
         poolHash: poolHash,
         underlyingToken: otherToken,
+        collateralToken: poolToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -127,6 +133,8 @@ describe('Borrower Pools - Governance functions', function () {
         poolHash:
           '0x0000000000000000000000000000000000000000000000000000000000000000',
         underlyingToken: otherToken,
+        collateralToken: poolToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -154,6 +162,8 @@ describe('Borrower Pools - Governance functions', function () {
       governanceUser.BorrowerPools.createNewPool({
         poolHash: newPoolHash,
         underlyingToken: otherToken,
+        collateralToken: poolToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -175,7 +185,9 @@ describe('Borrower Pools - Governance functions', function () {
       .withArgs([
         newPoolHash,
         otherToken,
+        poolToken,
         mockLendingPool.address,
+        8000,
         minRateInput,
         maxRateInput,
         rateSpacingInput,
@@ -203,6 +215,8 @@ describe('Borrower Pools - Governance functions', function () {
       governanceUser.BorrowerPools.createNewPool({
         poolHash: newPoolHash,
         underlyingToken: otherToken,
+        collateralToken: poolToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -224,7 +238,9 @@ describe('Borrower Pools - Governance functions', function () {
       .withArgs([
         newPoolHash,
         otherToken,
+        poolToken,
         mockLendingPool.address,
+        8000,
         minRateInput,
         maxRateInput,
         rateSpacingInput,
@@ -252,6 +268,8 @@ describe('Borrower Pools - Governance functions', function () {
       governanceUser.BorrowerPools.createNewPool({
         poolHash: newPoolHash,
         underlyingToken: otherToken,
+        collateralToken: poolToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -280,6 +298,8 @@ describe('Borrower Pools - Governance functions', function () {
       governanceUser.BorrowerPools.createNewPool({
         poolHash: newPoolHash,
         underlyingToken: otherToken,
+        collateralToken: poolToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -372,6 +392,8 @@ describe('Borrower Pools - Governance functions', function () {
     await governanceUser.BorrowerPools.createNewPool({
       poolHash: otherPoolHash,
       underlyingToken: otherToken,
+      collateralToken: poolToken,
+      ltv: 8000,
       yieldProvider: mockLendingPool.address,
       minRate: minRateInput,
       maxRate: maxRateInput,
@@ -405,6 +427,8 @@ describe('Borrower Pools - Governance functions', function () {
     await governanceUser.BorrowerPools.createNewPool({
       poolHash: otherPoolHash,
       underlyingToken: otherToken,
+      collateralToken: poolToken,
+      ltv: 8000,
       yieldProvider: mockLendingPool.address,
       minRate: minRateInput,
       maxRate: maxRateInput,

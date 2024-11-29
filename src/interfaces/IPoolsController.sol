@@ -249,7 +249,7 @@ interface IPoolsController {
   /**
    * @notice Set the maximum amount of tokens that can be borrowed in the target pool
    **/
-  function setMaxBorrowableAmount(uint128 maxTokenDeposit, bytes32 poolHash) external;
+  // function setMaxBorrowableAmount(uint128 maxTokenDeposit, bytes32 poolHash) external;
 
   /**
    * @notice Set the pool liquidity rewards distribution rate
@@ -259,7 +259,7 @@ interface IPoolsController {
   /**
    * @notice Set the pool establishment protocol fee rate
    **/
-  function setEstablishmentFeeRate(uint128 establishmentFeeRate, bytes32 poolHash) external;
+  // function setEstablishmentFeeRate(uint128 establishmentFeeRate, bytes32 poolHash) external;
 
   /**
    * @notice Set the pool repayment protocol fee rate

@@ -82,6 +82,8 @@ export const setupTestContracts = async (
   await governance.BorrowerPools.createNewPool({
     poolHash: poolHash,
     underlyingToken: mocks.DepositToken1.address,
+    collateralToken: mocks.DepositToken2.address,
+    ltv: 8000,
     yieldProvider: mocks.ILendingPool.address,
     minRate: minRateInput,
     maxRate: maxRateInput,
