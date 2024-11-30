@@ -18,27 +18,30 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const ZERO_ADDRESS = ethers.constants.AddressZero;
 
   // deploy LendingPool
-  const PoolWrapper = await deploy('LendingPool', {
-    contract: 'LendingPool',
+  const PoolWrapper = await deploy('Pool', {
+    contract: 'Pool',
     from: deployer,
     log: true,
     args: [ZERO_ADDRESS],
   });
 
-  log('LendingPool contract: ' + PoolWrapper.address);
+  log('Pool contract: ' + PoolWrapper.address);
 
   const otherContracts = process.env.OTHER_CONTRACTS
     ? process.env.OTHER_CONTRACTS.split(',')
     : [];
+  const custodyWallet = process.env.CUSTODY_WALLET
+    ? process.env.CUSTODY_WALLET
+    : deployer;
   // deploy Treasury
   const Treasury = await deploy('Treasury', {
     contract: 'Treasury',
     from: deployer,
     log: true,
     args: [
-      PoolWrapper.address, //Replace with custody wallet env
+      custodyWallet, //Replace with custody wallet env
       PoolWrapper.address,
-      [deployer],
+      [deployer, PoolWrapper.address],
       [PoolWrapper.address, ...otherContracts], //update all .env
     ],
   });
@@ -47,7 +50,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   // Load the deployed Treasury contract
   const poolWrapperContract = await ethers.getContractAt(
-    'LendingPool',
+    'Pool',
     PoolWrapper.address
   );
 
@@ -62,5 +65,5 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 };
 
-func.tags = ['LendingPool', 'Treasury'];
+func.tags = ['Pool', 'Treasury'];
 export default func;

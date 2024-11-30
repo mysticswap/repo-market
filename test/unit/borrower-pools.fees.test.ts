@@ -4,7 +4,7 @@ import {deployments, ethers} from 'hardhat';
 
 import {MockContract} from '@ethereum-waffle/mock-contract';
 
-import {BorrowerPools} from '../../typechain';
+import {BorrowerPools, LendingPool} from '../../typechain';
 import {
   calcRealizedBondsQuantity,
   checkPoolUtil,
@@ -27,6 +27,7 @@ import {
   TEST_RETURN_YIELD_PROVIDER_LR_RAY,
   WAD,
   establishmentFeeRate,
+  FIRST_BOND_ISSUANCE_INDEX,
 } from '../utils/constants';
 import {PoolParameters, PoolState, User} from '../utils/types';
 import {expect} from './helpers/chai-setup';
@@ -50,6 +51,7 @@ describe('Borrower Pools - Fees', function () {
   let poolToken: string;
   let otherToken: string;
   let mockLendingPool: MockContract;
+  let mainLendingPool: LendingPool;
   const depositAmount: BigNumber = WAD.mul(20); //20 tokens deposited : arbitrary amount for testing purpose
   const timeIncrease = 36000;
   const oneSec = 1;
@@ -84,6 +86,7 @@ describe('Borrower Pools - Fees', function () {
     mockLendingPool = mocks.ILendingPool;
     checkPoolState = checkPoolUtil(borrower);
     checkTickAmounts = checkTickUtil(borrower);
+    mainLendingPool = deployer.LendingPool;
   });
 
   it('Top Up Liquidity Rewards from a paused pool should revert', async function () {
@@ -930,5 +933,188 @@ describe('Borrower Pools - Fees', function () {
     // )
     //   .to.emit(governanceUser.BorrowerPools, 'ClaimProtocolFees')
     //   .withArgs(poolHash, expectedProtocolFees, governanceUser.address);
+  });
+
+  it('Send to Pool Lender', async function () {
+    const newBorrowerName = `${poolHash}-otherToken`;
+    const newPoolHash = keccak256(
+      defaultAbiCoder.encode(['string'], [newBorrowerName])
+    );
+    const newLiquidityRewardsActivationThreshold = parseEther('100');
+    poolState = await BorrowerPools.getPoolState(newPoolHash);
+    expect(poolState.active).to.be.false;
+
+    await expect(
+      governanceUser.BorrowerPools.createNewPool({
+        poolHash: newPoolHash,
+        underlyingToken: poolToken,
+        collateralToken: otherToken,
+        ltv: 8000,
+        yieldProvider: mainLendingPool.address,
+        minRate: minRateInput,
+        maxRate: maxRateInput,
+        rateSpacing: rateSpacingInput,
+        maxBorrowableAmount: maxBorrowableAmount,
+        loanDuration: loanDuration,
+        distributionRate: distributionRate,
+        cooldownPeriod: cooldownPeriod,
+        repaymentPeriod: repaymentPeriod,
+        lateRepayFeePerBondRate: lateRepayFeePerBondRate,
+        establishmentFeeRate: establishmentFeeRate,
+        repaymentFeeRate: repaymentFeeRate,
+        liquidityRewardsActivationThreshold:
+          newLiquidityRewardsActivationThreshold,
+        earlyRepay: true,
+      })
+    )
+      .to.emit(governanceUser.BorrowerPools, 'PoolCreated')
+      .withArgs([
+        newPoolHash,
+        poolToken,
+        otherToken,
+        mainLendingPool.address,
+        8000,
+        minRateInput,
+        maxRateInput,
+        rateSpacingInput,
+        maxBorrowableAmount,
+        loanDuration,
+        distributionRate,
+        cooldownPeriod,
+        repaymentPeriod,
+        lateRepayFeePerBondRate,
+        establishmentFeeRate,
+        repaymentFeeRate,
+        newLiquidityRewardsActivationThreshold,
+        true,
+      ]);
+
+    await governanceUser.BorrowerPools.disallow(borrower.address, poolHash);
+    await governanceUser.BorrowerPools.allow(borrower.address, newPoolHash);
+
+    await expect(
+      borrower.BorrowerPools.topUpLiquidityRewards(
+        newLiquidityRewardsActivationThreshold
+      )
+    )
+      .to.emit(borrower.BorrowerPools, 'TopUpLiquidityRewards')
+      .withArgs(newPoolHash, newLiquidityRewardsActivationThreshold);
+
+    poolState = await BorrowerPools.getPoolState(poolHash);
+    expect(poolState.active).to.be.true;
+
+    await positionManager.BorrowerPools.deposit(
+      depositRate,
+      poolHash,
+      poolToken,
+      positionManager.address,
+      depositAmount
+    );
+  });
+
+  it('Send and Receive to Pool Lender', async function () {
+    const newBorrowerName = `${poolHash}-otherToken`;
+    const newPoolHash = keccak256(
+      defaultAbiCoder.encode(['string'], [newBorrowerName])
+    );
+    const newLiquidityRewardsActivationThreshold = parseEther('100');
+    poolState = await BorrowerPools.getPoolState(newPoolHash);
+    expect(poolState.active).to.be.false;
+    const withdrawAmount = depositAmount
+      .mul(RAY)
+      .div(TEST_RETURN_YIELD_PROVIDER_LR_RAY);
+
+    await expect(
+      governanceUser.BorrowerPools.createNewPool({
+        poolHash: newPoolHash,
+        underlyingToken: poolToken,
+        collateralToken: otherToken,
+        ltv: 8000,
+        yieldProvider: mainLendingPool.address,
+        minRate: minRateInput,
+        maxRate: maxRateInput,
+        rateSpacing: rateSpacingInput,
+        maxBorrowableAmount: maxBorrowableAmount,
+        loanDuration: loanDuration,
+        distributionRate: distributionRate,
+        cooldownPeriod: cooldownPeriod,
+        repaymentPeriod: repaymentPeriod,
+        lateRepayFeePerBondRate: lateRepayFeePerBondRate,
+        establishmentFeeRate: establishmentFeeRate,
+        repaymentFeeRate: repaymentFeeRate,
+        liquidityRewardsActivationThreshold:
+          newLiquidityRewardsActivationThreshold,
+        earlyRepay: true,
+      })
+    )
+      .to.emit(governanceUser.BorrowerPools, 'PoolCreated')
+      .withArgs([
+        newPoolHash,
+        poolToken,
+        otherToken,
+        mainLendingPool.address,
+        8000,
+        minRateInput,
+        maxRateInput,
+        rateSpacingInput,
+        maxBorrowableAmount,
+        loanDuration,
+        distributionRate,
+        cooldownPeriod,
+        repaymentPeriod,
+        lateRepayFeePerBondRate,
+        establishmentFeeRate,
+        repaymentFeeRate,
+        newLiquidityRewardsActivationThreshold,
+        true,
+      ]);
+
+    await governanceUser.BorrowerPools.disallow(borrower.address, poolHash);
+    await governanceUser.BorrowerPools.allow(borrower.address, newPoolHash);
+
+    await expect(
+      borrower.BorrowerPools.topUpLiquidityRewards(
+        newLiquidityRewardsActivationThreshold
+      )
+    )
+      .to.emit(borrower.BorrowerPools, 'TopUpLiquidityRewards')
+      .withArgs(newPoolHash, newLiquidityRewardsActivationThreshold);
+
+    poolState = await BorrowerPools.getPoolState(poolHash);
+    expect(poolState.active).to.be.true;
+
+    await positionManager.BorrowerPools.deposit(
+      depositRate,
+      poolHash,
+      poolToken,
+      positionManager.address,
+      depositAmount
+    );
+    await positionManager.BorrowerPools.deposit(
+      depositRate.add(rateSpacing),
+      poolHash,
+      poolToken,
+      positionManager.address,
+      depositAmount
+    );
+
+    await positionManager.BorrowerPools.withdraw(
+      poolHash,
+      depositRate,
+      withdrawAmount,
+      FIRST_BOND_ISSUANCE_INDEX,
+      positionManager.address
+    );
+
+    await checkPoolState(poolHash, {
+      normalizedAvailableDeposits: depositAmount,
+      lowerInterestRate: depositRate.add(rateSpacing),
+    });
+    await checkTickAmounts(poolHash, depositRate, {
+      adjustedTotalAmount: BigNumber.from(0),
+      adjustedRemainingAmount: BigNumber.from(0),
+      normalizedUsedAmount: BigNumber.from(0),
+      adjustedPendingDepositAmount: BigNumber.from(0),
+    });
   });
 });

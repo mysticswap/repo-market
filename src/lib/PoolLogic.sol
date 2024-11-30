@@ -646,4 +646,17 @@ library PoolLogic {
     underlyingToken.safeTransferFrom(from, address(this), scaledAmount);
     yieldProvider.deposit(pool.parameters.UNDERLYING_TOKEN, scaledAmount, address(this), 0);
   }
+
+  function depositCollateralToYieldProvider(
+    Types.Pool storage pool,
+    address from,
+    uint128 normalizedAmount
+  ) public {
+    IERC20Upgradeable underlyingToken = IERC20Upgradeable(pool.parameters.COLLATERAL_TOKEN);
+    uint128 scaledAmount = normalizedAmount.scaleFromWad(pool.parameters.COLLATERAL_TOKEN_DECIMALS);
+    ILendingPool yieldProvider = pool.parameters.YIELD_PROVIDER;
+    underlyingToken.safeIncreaseAllowance(address(yieldProvider), scaledAmount);
+    underlyingToken.safeTransferFrom(from, address(this), scaledAmount);
+    yieldProvider.deposit(pool.parameters.COLLATERAL_TOKEN, scaledAmount, address(this), 0);
+  }
 }

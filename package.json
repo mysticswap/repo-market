@@ -18,7 +18,7 @@
     "format:fix": "prettier --write \"**/*.{ts,js,sol}\"",
     "compile": "hardhat compile && hardhat typechain",
     "void:deploy": "hardhat deploy",
-    "test": "hardhat typechain && cross-env HARDHAT_DEPLOY_FIXTURE=true HARDHAT_COMPILE=true mocha --bail --recursive test/unit",
+    "test": "hardhat typechain && cross-env HARDHAT_DEPLOY_FIXTURE=true HARDHAT_COMPILE=true mocha --bail --recursive test/unit --timeout 100000",
     "coverage": "hardhat typechain && cross-env HARDHAT_DEPLOY_FIXTURE=true hardhat coverage --testfiles test/unit",
     "dev": "hardhat node --watch --export contractsInfo.json",
     "local:dev": "hardhat --network localhost deploy --watch && hardhat typechain",

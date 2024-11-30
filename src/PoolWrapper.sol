@@ -7,7 +7,9 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "./extensions/ITreasury.sol";
 
-contract LendingPool is Ownable {
+import "./extensions/AaveILendingPool.sol";
+
+contract Pool is Ownable, ILendingPool {
   using SafeMath for uint256;
   ITreasury treasury;
 
@@ -27,6 +29,7 @@ contract LendingPool is Ownable {
   uint256 public constant INTEREST_RATE = 0; // 5% annual interest
   uint256 public constant INTEREST_RATE_PRECISION = 10000;
   uint256 public constant SECONDS_PER_YEAR = 365 days;
+  uint256 public MULTIPLIER = 1;
 
   // Events
   event Deposit(address indexed user, address indexed token, uint256 amount);
@@ -43,7 +46,7 @@ contract LendingPool is Ownable {
     address token,
     uint256 amount,
     address to,
-    bool
+    uint16
   ) external {
     require(amount > 0, "Deposit amount must be greater than 0");
 
@@ -59,6 +62,7 @@ contract LendingPool is Ownable {
     totalReserves[token] = totalReserves[token].add(amount);
 
     // send to treasury if asset is supported
+    IERC20(token).approve(address(treasury), amount);
     if (treasury.isSupportedAsset(token)) {
       treasury.depositAsset(token, amount);
     }
@@ -72,7 +76,7 @@ contract LendingPool is Ownable {
     address token,
     uint256 amount,
     address to
-  ) external {
+  ) external returns (uint256) {
     UserDeposit storage userDeposit = userDeposits[msg.sender][token];
 
     require(amount > 0, "Withdrawal amount must be greater than 0");
@@ -93,6 +97,8 @@ contract LendingPool is Ownable {
 
     emit Withdrawal(to, token, totalWithdrawalAmount);
     emit ReserveUpdated(token, totalReserves[token]);
+
+    return amount;
   }
 
   // Interest calculation function
@@ -109,8 +115,8 @@ contract LendingPool is Ownable {
   function getReserveNormalizedIncome(address token) external view returns (uint256) {
     uint256 totalDeposits = totalReserves[token];
     uint256 normalizedIncome = (totalDeposits > 0)
-      ? ((totalDeposits.add(calculateTotalInterest(token))) * 1e27) / totalDeposits
-      : 1e27;
+      ? ((totalDeposits.add(calculateTotalInterest(token))) * 1e27 * MULTIPLIER) / totalDeposits
+      : 1e27 * MULTIPLIER;
 
     return normalizedIncome;
   }
@@ -123,10 +129,16 @@ contract LendingPool is Ownable {
   }
 
   function updateTreasury(address _treasury) external onlyOwner {
-    require(_treasury != address(0), "Invalid repo wallet");
+    require(_treasury != address(0), "Invalid treasury");
 
     treasury = ITreasury(_treasury);
     emit TeasuryUpdated(_treasury);
+  }
+
+  function updateMultiplier(uint256 _multiplier) external onlyOwner {
+    require(_multiplier > 0 && _multiplier <= 100, "Invalid multiplier");
+
+    MULTIPLIER = _multiplier;
   }
 
   // Fallback function to reject direct transfers

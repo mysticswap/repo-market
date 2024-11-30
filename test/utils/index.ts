@@ -14,6 +14,8 @@ import {
   BorrowerPools,
   BorrowerPools__factory,
   FlashLoanAttacker__factory,
+  LendingPool,
+  LendingPool__factory,
   PoolLogic__factory,
   PositionDescriptor,
   PositionDescriptor__factory,
@@ -23,6 +25,8 @@ import {
 import {secondsPerYear, WAD} from './constants';
 import {User} from './types';
 import {parseEther} from 'ethers/lib/utils';
+import {Treasury} from '../../typechain/Treasury';
+import {Treasury__factory} from '../../typechain/factories/Treasury__factory';
 
 export async function setupUsers<
   T extends {[contractName: string]: Contract | ContractFactory}
@@ -87,6 +91,12 @@ export async function setupFixture(fixtureName: string) {
     PositionManagerF: <PositionManager__factory>(
       await ethers.getContractFactory('PositionManager')
     ),
+    LendingPool: <LendingPool>await ethers.getContract('LendingPool'),
+    LendingPoolF: <LendingPool__factory>(
+      await ethers.getContractFactory('LendingPool')
+    ),
+    Treasury: <Treasury>await ethers.getContract('Treasury'),
+    TreasuryF: <Treasury__factory>await ethers.getContractFactory('Treasury'),
     PositionDescriptor: <PositionDescriptor>(
       await ethers.getContract('PositionDescriptor')
     ),
@@ -258,6 +268,9 @@ export function checkPoolUtil(borrower: User) {
           .abs()
           .lt(10);
       }
+      console.log(
+        `bondsIssuedQuantity : expected ${bondsIssuedQuantity}, got ${poolState.bondsIssuedQuantity}`
+      );
       expect(
         res,
         `bondsIssuedQuantity : expected ${bondsIssuedQuantity}, got ${poolState.bondsIssuedQuantity}`
@@ -301,6 +314,7 @@ export function checkTickUtil(borrower: User) {
       atlendisLiquidityRatioBP,
       accruedFeesBP,
     ] = await borrower.BorrowerPools.getTickAmounts(poolHash, rate);
+    console.log(adjustedTotalAmountBP + '', adjustedTotalAmount + '');
     if (adjustedTotalAmount) {
       expect(
         adjustedTotalAmountBP.sub(adjustedTotalAmount).abs().lt(10),

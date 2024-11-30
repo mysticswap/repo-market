@@ -512,7 +512,7 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     protocolFees[poolHash] += normalizedEstablishmentFee;
     pool.state.normalizedBorrowedAmount += normalizedLoanAmount;
     // deposit collateral
-    pool.depositToYieldProvider(_msgSender(), normalizedCollateralAmount);
+    pool.depositCollateralToYieldProvider(_msgSender(), normalizedCollateralAmount);
     pool.parameters.YIELD_PROVIDER.withdraw(
       pool.parameters.UNDERLYING_TOKEN,
       normalizedBorrowedAmount.scaleFromWad(pool.parameters.TOKEN_DECIMALS),
@@ -573,7 +573,7 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     }
 
     uint128 normalizedCollateralAmount = (10000 *
-      (normalizedRepayAmount.scaleFromWad(pool.parameters.TOKEN_DECIMALS)).scaleToWad(
+      (pool.state.normalizedBorrowedAmount.scaleFromWad(pool.parameters.TOKEN_DECIMALS)).scaleToWad(
         pool.parameters.COLLATERAL_TOKEN_DECIMALS
       )) / pool.parameters.LTV;
     uint128 repaymentFees = pool.getRepaymentFees(normalizedRepayAmount);

@@ -10,7 +10,9 @@ import {
   PositionManager__factory,
   PositionDescriptor,
   PositionDescriptor__factory,
+  LendingPool,
 } from '../../typechain';
+import {Treasury} from '../../typechain/Treasury';
 
 export interface PoolParameters {
   underlyingToken: string;
@@ -53,6 +55,8 @@ export type Deployer = {
   PositionManagerF: PositionManager__factory;
   PositionDescriptor: PositionDescriptor;
   PositionDescriptorF: PositionDescriptor__factory;
+  Treasury: Treasury;
+  LendingPool: LendingPool;
 };
 
 export type Mocks = {

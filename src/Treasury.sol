@@ -54,6 +54,7 @@ contract Treasury is AccessControl, ReentrancyGuard, Pausable {
   // State variables
   address public custodyWallet;
   address public repoLocker;
+  bytes32 public lastRequestId;
 
   // Events
   event AssetDeposited(address indexed token, uint256 amount, address indexed depositor);
@@ -149,6 +150,7 @@ contract Treasury is AccessControl, ReentrancyGuard, Pausable {
 
     // Check withdrawal limits and create unique request ID
     bytes32 requestId = keccak256(abi.encodePacked(block.timestamp, msg.sender, block.number));
+    lastRequestId = requestId;
 
     // Create withdrawal request
     withdrawalRequests[requestId] = WithdrawalRequest({
@@ -225,6 +227,15 @@ contract Treasury is AccessControl, ReentrancyGuard, Pausable {
     require(!supportedAssets[token].isActive, "Asset already supported");
 
     supportedAssets[token] = AssetInfo({tokenAddress: token, totalDeposited: 0, isActive: true});
+  }
+
+  /**
+   * @dev Add a new supported target
+   * @param _target target to support
+   */
+  function addApprovedTarget(address _target) external onlyRole(TREASURY_MANAGER_ROLE) {
+    require(_target != address(0), "Invalid token address");
+    approvedTargets[_target] = true;
   }
 
   /**

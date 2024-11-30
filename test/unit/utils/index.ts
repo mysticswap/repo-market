@@ -1,5 +1,5 @@
 import {BigNumber} from 'ethers';
-import {BorrowerPools, PositionManager} from '../../../typechain';
+import {BorrowerPools, LendingPool, PositionManager} from '../../../typechain';
 import {setupUser} from '../../utils';
 import {
   cooldownPeriod,
@@ -20,6 +20,7 @@ import {
   GOVERNANCE_ROLE,
 } from '../../utils/constants';
 import {Deployer, Mocks, User} from '../../utils/types';
+import {Treasury} from '../../../typechain/Treasury';
 
 //Functional setup for Position Contract Tests :
 //Deploying Contracts, mocking returned values from Aave LendingPool Contract, returning users
@@ -35,15 +36,20 @@ export const setupTestContracts = async (
   testUser1: User;
   testUser2: User;
   testBorrower: User;
+  testLiquidator: User;
   testPositionManager: User;
   poolHash: string;
   poolTokenAddress: string;
   otherTokenAddress: string;
+  deployedTreasury: Treasury;
+  deployedLendingPool: LendingPool;
 }> => {
   const deployedPositionManagerDescriptor =
     await deployer.PositionDescriptorF.deploy();
   const deployedBorrowerPools = await deployer.BorrowerPoolsF.deploy();
   const deployedPositionManager = await deployer.PositionManagerF.deploy();
+  const deployedTreasury = await deployer.Treasury;
+  const deployedLendingPool = await deployer.LendingPool;
 
   const deployerAddress =
     await deployedPositionManagerDescriptor.signer.getAddress();
@@ -65,7 +71,13 @@ export const setupTestContracts = async (
   await mocks.DepositToken1.mock.allowance.returns(maxBorrowableAmount);
   await mocks.DepositToken1.mock.approve.returns(true);
   await mocks.DepositToken1.mock.transferFrom.returns(true);
+  await mocks.DepositToken1.mock.transfer.returns(true);
   await mocks.DepositToken1.mock.decimals.returns(18);
+
+  await mocks.DepositToken2.mock.allowance.returns(maxBorrowableAmount);
+  await mocks.DepositToken2.mock.approve.returns(true);
+  await mocks.DepositToken2.mock.transferFrom.returns(true);
+  await mocks.DepositToken2.mock.transfer.returns(true);
   await mocks.DepositToken2.mock.decimals.returns(18);
 
   await deployedBorrowerPools.grantRole(
@@ -84,6 +96,7 @@ export const setupTestContracts = async (
     underlyingToken: mocks.DepositToken1.address,
     collateralToken: mocks.DepositToken2.address,
     ltv: 8000,
+    // yieldProvider: deployedLendingPool.address,
     yieldProvider: mocks.ILendingPool.address,
     minRate: minRateInput,
     maxRate: maxRateInput,
@@ -116,6 +129,10 @@ export const setupTestContracts = async (
     BorrowerPools: deployedBorrowerPools,
     PositionManager: deployedPositionManager,
   });
+  const testLiquidator = await setupUser(users[5].address, {
+    BorrowerPools: deployedBorrowerPools,
+    PositionManager: deployedPositionManager,
+  });
   await governance.BorrowerPools.allow(testBorrower.address, poolHash);
 
   const testPositionManager = await setupUser(users[4].address, {
@@ -137,9 +154,12 @@ export const setupTestContracts = async (
     testUser1,
     testUser2,
     testBorrower,
+    testLiquidator,
     testPositionManager,
     poolHash,
     poolTokenAddress,
     otherTokenAddress,
+    deployedLendingPool,
+    deployedTreasury,
   };
 };
