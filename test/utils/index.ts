@@ -14,8 +14,6 @@ import {
   BorrowerPools,
   BorrowerPools__factory,
   FlashLoanAttacker__factory,
-  LendingPool,
-  LendingPool__factory,
   PoolLogic__factory,
   PositionDescriptor,
   PositionDescriptor__factory,
@@ -27,6 +25,8 @@ import {User} from './types';
 import {parseEther} from 'ethers/lib/utils';
 import {Treasury} from '../../typechain/Treasury';
 import {Treasury__factory} from '../../typechain/factories/Treasury__factory';
+import {Pool} from '../../typechain/Pool';
+import {Pool__factory} from '../../typechain/factories/Pool__factory';
 
 export async function setupUsers<
   T extends {[contractName: string]: Contract | ContractFactory}
@@ -62,6 +62,7 @@ export async function setupFixture(fixtureName: string) {
 
   const DepositToken1C = await deployMockContract(signerDeployer, ERC20.abi);
   const DepositToken2C = await deployMockContract(signerDeployer, ERC20.abi);
+  const DepositToken3C = await deployMockContract(signerDeployer, ERC20.abi);
   const PositionC = await deployMockContract(signerDeployer, Position.abi);
   const ILendingPoolC = await deployMockContract(
     signerDeployer,
@@ -91,10 +92,8 @@ export async function setupFixture(fixtureName: string) {
     PositionManagerF: <PositionManager__factory>(
       await ethers.getContractFactory('PositionManager')
     ),
-    LendingPool: <LendingPool>await ethers.getContract('LendingPool'),
-    LendingPoolF: <LendingPool__factory>(
-      await ethers.getContractFactory('LendingPool')
-    ),
+    LendingPool: <Pool>await ethers.getContract('Pool'),
+    LendingPoolF: <Pool__factory>await ethers.getContractFactory('Pool'),
     Treasury: <Treasury>await ethers.getContract('Treasury'),
     TreasuryF: <Treasury__factory>await ethers.getContractFactory('Treasury'),
     PositionDescriptor: <PositionDescriptor>(
@@ -114,6 +113,7 @@ export async function setupFixture(fixtureName: string) {
     mocks: {
       DepositToken1: DepositToken1C,
       DepositToken2: DepositToken2C,
+      DepositToken3: DepositToken3C,
       PositionManager: PositionC,
       BorrowerPools: BorrowerPoolsC,
       ILendingPool: ILendingPoolC,
@@ -220,6 +220,9 @@ export function checkPoolUtil(borrower: User) {
           .abs()
           .lt(1000);
       }
+      // console.log(
+      //   `normalizedAvailableDeposits : expected ${normalizedAvailableDeposits}, got ${poolState.normalizedAvailableDeposits}`
+      // );
       expect(
         res,
         `normalizedAvailableDeposits : expected ${normalizedAvailableDeposits}, got ${poolState.normalizedAvailableDeposits}`
@@ -268,9 +271,9 @@ export function checkPoolUtil(borrower: User) {
           .abs()
           .lt(10);
       }
-      console.log(
-        `bondsIssuedQuantity : expected ${bondsIssuedQuantity}, got ${poolState.bondsIssuedQuantity}`
-      );
+      // console.log(
+      //   `bondsIssuedQuantity : expected ${bondsIssuedQuantity}, got ${poolState.bondsIssuedQuantity}`
+      // );
       expect(
         res,
         `bondsIssuedQuantity : expected ${bondsIssuedQuantity}, got ${poolState.bondsIssuedQuantity}`
@@ -314,7 +317,8 @@ export function checkTickUtil(borrower: User) {
       atlendisLiquidityRatioBP,
       accruedFeesBP,
     ] = await borrower.BorrowerPools.getTickAmounts(poolHash, rate);
-    console.log(adjustedTotalAmountBP + '', adjustedTotalAmount + '');
+    // console.log(adjustedTotalAmountBP + '', adjustedTotalAmount + '');
+
     if (adjustedTotalAmount) {
       expect(
         adjustedTotalAmountBP.sub(adjustedTotalAmount).abs().lt(10),
@@ -375,6 +379,9 @@ export function checkTickUtil(borrower: User) {
       ).to.be.true;
     }
     if (bondsQuantity) {
+      // console.log(
+      //   `bondsQuantity : expected ${bondsQuantity}, got ${bondsQuantityBP}`
+      // );
       expect(
         bondsQuantityBP.sub(bondsQuantity).abs().lt(50),
         `bondsQuantity : expected ${bondsQuantity}, got ${bondsQuantityBP}`

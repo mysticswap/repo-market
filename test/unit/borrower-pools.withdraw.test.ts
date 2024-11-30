@@ -21,7 +21,7 @@ import {
   TEST_RETURN_YIELD_PROVIDER_LR_RAY,
   WAD,
 } from '../utils/constants';
-import {PoolParameters, User} from '../utils/types';
+import {Deployer, PoolParameters, User} from '../utils/types';
 import {expect} from './helpers/chai-setup';
 import {setupTestContracts} from './utils';
 import {MockContract} from 'ethereum-waffle';
@@ -31,7 +31,10 @@ const setup = deployments.createFixture(async () => {
 });
 
 describe('Borrower Pools - Withdraw', function () {
-  let positionManager: User, borrower: User, governanceUser: User;
+  let positionManager: User,
+    borrower: User,
+    governanceUser: User,
+    mockDeployer: Deployer;
   let BorrowerPools: BorrowerPools;
   let mockLendingPool: MockContract;
   let poolParameters: PoolParameters;
@@ -70,6 +73,7 @@ describe('Borrower Pools - Withdraw', function () {
     maxBorrowableAmount = poolParameters.maxBorrowableAmount;
     depositRate = minRate.add(rateSpacing); //Tokens deposited at the min_rate + rate_spacing
     positionManager = testPositionManager;
+    mockDeployer = deployer;
     borrower = testBorrower;
     governanceUser = governance;
     poolToken = poolTokenAddress;
@@ -1074,9 +1078,10 @@ describe('Borrower Pools - Withdraw', function () {
       adjustedPendingDepositAmount: BigNumber.from(0),
     });
 
-    await mockLendingPool.mock.getReserveNormalizedIncome.returns(
-      TEST_RETURN_YIELD_PROVIDER_LR_RAY.mul(2)
-    );
+    // await mockLendingPool.mock.getReserveNormalizedIncome.returns(
+    //   TEST_RETURN_YIELD_PROVIDER_LR_RAY.mul(2)
+    // );
+    await mockDeployer.LendingPool.updateMultiplier(4);
 
     await expect(
       positionManager.BorrowerPools.withdraw(
@@ -1121,9 +1126,10 @@ describe('Borrower Pools - Withdraw', function () {
     // This is simulated by having very high liquidity ratio.
     const testReturnYieldProviderLrRay =
       TEST_RETURN_YIELD_PROVIDER_LR_RAY.mul(3);
-    await mockLendingPool.mock.getReserveNormalizedIncome.returns(
-      testReturnYieldProviderLrRay
-    );
+    // await mockLendingPool.mock.getReserveNormalizedIncome.returns(
+    //   testReturnYieldProviderLrRay
+    // );
+    await mockDeployer.LendingPool.updateMultiplier(6);
 
     const depositAmount = WAD.div(10);
     // The first tick is fully borrowed
@@ -1161,9 +1167,10 @@ describe('Borrower Pools - Withdraw', function () {
     expect(amounts.remainingBondsQuantity.isZero()).to.be.false;
     expect(amounts.bondsMaturity.isZero()).to.be.false;
 
-    await mockLendingPool.mock.getReserveNormalizedIncome.returns(
-      TEST_RETURN_YIELD_PROVIDER_LR_RAY
-    );
+    // await mockLendingPool.mock.getReserveNormalizedIncome.returns(
+    //   TEST_RETURN_YIELD_PROVIDER_LR_RAY
+    // );
+    await mockDeployer.LendingPool.updateMultiplier(2);
   });
 
   // Test illustration of the issue #69
@@ -1172,9 +1179,11 @@ describe('Borrower Pools - Withdraw', function () {
     // This is simulated by having very high liquidity ratio.
     const testReturnYieldProviderLrRay =
       TEST_RETURN_YIELD_PROVIDER_LR_RAY.mul(3);
-    await mockLendingPool.mock.getReserveNormalizedIncome.returns(
-      testReturnYieldProviderLrRay
-    );
+    // await mockLendingPool.mock.getReserveNormalizedIncome.returns(
+    //   testReturnYieldProviderLrRay
+    // );
+
+    await mockDeployer.LendingPool.updateMultiplier(6);
 
     const depositAmount = WAD.div(10);
     // The first tick is almost fully borrowed
@@ -1205,8 +1214,10 @@ describe('Borrower Pools - Withdraw', function () {
     expect(amounts.remainingBondsQuantity.isZero()).to.be.false;
     expect(amounts.bondsMaturity.isZero()).to.be.false;
 
-    await mockLendingPool.mock.getReserveNormalizedIncome.returns(
-      TEST_RETURN_YIELD_PROVIDER_LR_RAY
-    );
+    // await mockLendingPool.mock.getReserveNormalizedIncome.returns(
+    //   TEST_RETURN_YIELD_PROVIDER_LR_RAY
+    // );
+
+    await mockDeployer.LendingPool.updateMultiplier(2);
   });
 });

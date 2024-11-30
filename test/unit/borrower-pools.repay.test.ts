@@ -29,7 +29,7 @@ import {
   secondsPerYear,
   establishmentFeeRate,
 } from '../utils/constants';
-import {PoolParameters, User} from '../utils/types';
+import {Deployer, PoolParameters, User} from '../utils/types';
 import {expect} from './helpers/chai-setup';
 import {setupTestContracts} from './utils';
 
@@ -41,7 +41,8 @@ describe('Borrower Pools - Repay', function () {
   let positionManager: User,
     borrower: User,
     governanceUser: User,
-    liquidator: User;
+    liquidator: User,
+    mockDeployer: Deployer;
   let BorrowerPools: BorrowerPools;
   let poolParameters: PoolParameters;
   let depositRate: BigNumber,
@@ -86,6 +87,7 @@ describe('Borrower Pools - Repay', function () {
     maxBorrowableAmount = poolParameters.maxBorrowableAmount;
     depositRate = minRate.add(rateSpacing); //Tokens deposited at the min_rate + rate_spacing
     positionManager = testPositionManager;
+    mockDeployer = deployer;
     borrower = testBorrower;
     liquidator = testLiquidator;
     governanceUser = governance;
@@ -1048,9 +1050,10 @@ describe('Borrower Pools - Repay', function () {
       }
     );
 
-    await mockLendingPool.mock.getReserveNormalizedIncome.returns(
-      TEST_RETURN_YIELD_PROVIDER_LR_RAY.mul(2)
-    );
+    // await mockLendingPool.mock.getReserveNormalizedIncome.returns(
+    //   TEST_RETURN_YIELD_PROVIDER_LR_RAY.mul(2)
+    // );
+    await mockDeployer.LendingPool.updateMultiplier(4);
     await ethers.provider.send('evm_increaseTime', [loanDuration.toNumber()]);
     await ethers.provider.send('evm_mine', []);
     const currentMaturity = (await BorrowerPools.getPoolState(poolHash))
