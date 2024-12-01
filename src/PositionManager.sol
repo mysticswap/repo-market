@@ -20,11 +20,13 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
 
   IBorrowerPools public pools;
   IPositionDescriptor public positionDescriptor;
+  address public owner;
 
   // next position id
   uint128 private _nextId;
 
   mapping(uint128 => Types.PositionDetails) public _positions;
+  mapping(address => bool) public managers;
 
   function initialize(
     string memory _name,
@@ -36,6 +38,7 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
     pools = _pools;
     positionDescriptor = _positionDescriptor;
     _nextId = 1;
+    owner = _msgSender();
   }
 
   // VIEW METHODS
@@ -220,6 +223,62 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
   }
 
   /**
+   * @notice Deposits tokens into the yield provider and places a bid at the indicated rate within the
+   * respective pool's order book. A new position is created within the positions map that keeps
+   * track of this position's composition. An ERC721 NFT is minted for the user as a representation
+   * of the position.
+   * @param to The address for which the position is created
+   * @param amount The amount of tokens to be deposited
+   * @param rate The rate at which to bid for a bonds
+   * @param poolHash The identifier of the pool
+   * @param underlyingToken The contract address of the token to be deposited
+   **/
+  function depositFor(
+    address to,
+    uint128 amount,
+    uint128 rate,
+    bytes32 poolHash,
+    address underlyingToken
+  ) external returns (uint128 tokenId) {
+    if (amount == 0) {
+      revert Errors.POS_ZERO_AMOUNT();
+    }
+
+    if (!managers[_msgSender()]) {
+      revert Errors.POS_NOT_ALLOWED();
+    }
+
+    tokenId = _nextId++;
+
+    _safeMint(to, tokenId);
+
+    uint8 decimals = ERC20Upgradeable(underlyingToken).decimals();
+
+    uint128 normalizedAmount = amount.scaleToWad(decimals);
+
+    (uint128 adjustedBalance, uint128 bondsIssuanceIndex) = pools.deposit(
+      rate,
+      poolHash,
+      underlyingToken,
+      to,
+      normalizedAmount
+    );
+
+    _positions[tokenId] = Types.PositionDetails({
+      adjustedBalance: adjustedBalance,
+      rate: rate,
+      poolHash: poolHash,
+      underlyingToken: underlyingToken,
+      remainingBonds: 0,
+      bondsMaturity: 0,
+      bondsIssuanceIndex: bondsIssuanceIndex,
+      creationTimestamp: uint128(block.timestamp)
+    });
+
+    emit Deposit(to, tokenId, normalizedAmount, rate, poolHash, bondsIssuanceIndex);
+  }
+
+  /**
    * @notice Allows a user to update the rate at which to bid for bonds. A rate is only
    * upgradable as long as the full amount of deposits are currently allocated with the
    * yield provider i.e the position does not hold any bonds.
@@ -324,5 +383,13 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
     positionDescriptor = IPositionDescriptor(_positionDescriptor);
 
     emit SetPositionDescriptor(_positionDescriptor);
+  }
+
+  function updateManager(address _manager, bool action) external {
+    if (owner != _msgSender()) {
+      revert Errors.POS_NOT_ALLOWED();
+    }
+
+    managers[_manager] = action;
   }
 }

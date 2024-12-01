@@ -142,7 +142,7 @@ contract Treasury is AccessControl, ReentrancyGuard, Pausable {
     uint256[] memory amounts, // Updated to accept an array of amounts
     address target,
     bytes memory data
-  ) external nonReentrant whenNotPaused returns (bytes32) {
+  ) external onlyRole(WITHDRAWAL_OPERATOR_ROLE) nonReentrant whenNotPaused returns (bytes32) {
     require(assets.length == amounts.length, "Assets and amounts length mismatch");
 
     // Check if target is approved
