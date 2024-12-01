@@ -206,6 +206,7 @@ contract Treasury is AccessControl, ReentrancyGuard, Pausable {
       pendingWithdrawals[request.asset[i]] -= request.amount[i];
       // Safely transfer tokens from sender to locker
       IERC20(request.asset[i]).safeTransfer(repoLocker, request.amount[i]);
+      supportedAssets[request.asset[i]].totalDeposited -= request.amount[i];
       emit WithdrawalCompleted(requestId, request.user, request.asset[i], request.amount[i]);
     }
 
@@ -320,6 +321,22 @@ contract Treasury is AccessControl, ReentrancyGuard, Pausable {
   {
     AssetInfo memory asset = supportedAssets[token];
     return (asset.tokenAddress, asset.totalDeposited, asset.isActive);
+  }
+
+  /**
+   * @dev Add a operator role
+   * @param _withdrawalOperator Address to grant operator role
+   */
+  function addWithdrawalOperator(address _withdrawalOperator) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    grantRole(WITHDRAWAL_OPERATOR_ROLE, _withdrawalOperator);
+  }
+
+  /**
+   * @dev Remove a operator role
+   * @param _withdrawalOperator Address to revoke operator role
+   */
+  function removeWithdrawalOperator(address _withdrawalOperator) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    revokeRole(WITHDRAWAL_OPERATOR_ROLE, _withdrawalOperator);
   }
 
   /**
