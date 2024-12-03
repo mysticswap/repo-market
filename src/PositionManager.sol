@@ -14,6 +14,7 @@ import "./lib/Errors.sol";
 import "./lib/Roles.sol";
 import "./lib/Scaling.sol";
 import "./lib/Types.sol";
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 
 contract PositionManager is ERC721Upgradeable, IPositionManager {
   using Scaling for uint128;
@@ -21,6 +22,7 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
   IBorrowerPools public pools;
   IPositionDescriptor public positionDescriptor;
   address public owner;
+  address public kycId;
 
   // next position id
   uint128 private _nextId;
@@ -39,6 +41,11 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
     positionDescriptor = _positionDescriptor;
     _nextId = 1;
     owner = _msgSender();
+  }
+
+  modifier onlyKYCed() {
+    if (kycId == address(0) || IERC721(kycId).balanceOf(msg.sender) > 0) revert Errors.NOT_KYCED();
+    _;
   }
 
   // VIEW METHODS
@@ -187,7 +194,7 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
     uint128 rate,
     bytes32 poolHash,
     address underlyingToken
-  ) external override returns (uint128 tokenId) {
+  ) external override onlyKYCed returns (uint128 tokenId) {
     if (amount == 0) {
       revert Errors.POS_ZERO_AMOUNT();
     }
@@ -285,7 +292,7 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
    * @param tokenId The tokenId of the position
    * @param newRate The new rate at which to bid for bonds
    **/
-  function updateRate(uint128 tokenId, uint128 newRate) external override {
+  function updateRate(uint128 tokenId, uint128 newRate) external override onlyKYCed {
     if (ownerOf(tokenId) != _msgSender()) {
       revert Errors.POS_MGMT_ONLY_OWNER();
     }
@@ -315,7 +322,7 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
    * The bonds portion of the position is not affected.
    * @param tokenId The tokenId of the position
    **/
-  function withdraw(uint128 tokenId) external override {
+  function withdraw(uint128 tokenId) external override onlyKYCed {
     if (ownerOf(tokenId) != _msgSender()) {
       revert Errors.POS_MGMT_ONLY_OWNER();
     }
@@ -391,5 +398,13 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
     }
 
     managers[_manager] = action;
+  }
+
+  function activateKYC(address _kycId) external {
+    if (owner != _msgSender()) {
+      revert Errors.POS_NOT_ALLOWED();
+    }
+    // check for address zero is intentionally removed to allow zero address be set to deactivate kyc if needed
+    kycId = _kycId;
   }
 }

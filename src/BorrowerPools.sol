@@ -5,8 +5,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "./interfaces/IBorrowerPools.sol";
-
-import "./extensions/AaveILendingPool.sol";
 import "./lib/Errors.sol";
 import "./lib/PoolLogic.sol";
 import "./lib/Scaling.sol";
@@ -15,10 +13,13 @@ import "./lib/Uint128WadRayMath.sol";
 
 import "./PoolsController.sol";
 
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+
 contract BorrowerPools is PoolsController, IBorrowerPools {
   using PoolLogic for Types.Pool;
   using Scaling for uint128;
   using Uint128WadRayMath for uint128;
+  address public kycId;
 
   function initialize(address governance) public initializer {
     _initialize();
@@ -30,6 +31,11 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     _grantRole(Roles.GOVERNANCE_ROLE, governance);
     _setRoleAdmin(Roles.BORROWER_ROLE, Roles.GOVERNANCE_ROLE);
     _setRoleAdmin(Roles.POSITION_ROLE, Roles.GOVERNANCE_ROLE);
+  }
+
+  modifier onlyKYCed() {
+    if (kycId == address(0) || IERC721(kycId).balanceOf(msg.sender) > 0) revert Errors.NOT_KYCED();
+    _;
   }
 
   // VIEW METHODS
@@ -456,7 +462,13 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
    * @param to The address to which the borrowed funds should be sent.
    * @param loanAmount The total amount of the loan
    **/
-  function borrow(address to, uint128 loanAmount) external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
+  function borrow(address to, uint128 loanAmount)
+    external
+    override
+    whenNotPaused
+    onlyKYCed
+    onlyRole(Roles.BORROWER_ROLE)
+  {
     bytes32 poolHash = borrowerAuthorizedPools[_msgSender()];
     Types.Pool storage pool = pools[poolHash];
     if (pool.state.closed) {
@@ -519,7 +531,7 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
   /**
    * @notice Repays a currently outstanding bonds of the given pool for a borrower
    **/
-  function repay() external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
+  function repay() external override whenNotPaused onlyKYCed onlyRole(Roles.BORROWER_ROLE) {
     address borrower = _msgSender();
     bytes32 poolHash = borrowerAuthorizedPools[borrower];
     Types.Pool storage pool = pools[poolHash];
@@ -609,7 +621,13 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
    * is distributed to liquidity providers at the pre-defined distribution rate.
    * @param amount Amount of tokens that will be add up to the pool's liquidity rewards reserve
    **/
-  function topUpLiquidityRewards(uint128 amount) external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
+  function topUpLiquidityRewards(uint128 amount)
+    external
+    override
+    onlyKYCed
+    whenNotPaused
+    onlyRole(Roles.BORROWER_ROLE)
+  {
     Types.Pool storage pool = pools[borrowerAuthorizedPools[_msgSender()]];
     uint128 normalizedAmount = amount.scaleToWad(pool.parameters.TOKEN_DECIMALS);
 
@@ -642,5 +660,10 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     } else {
       pool.collectFees(rate);
     }
+  }
+
+  function activateKYC(address _kycId) external onlyRole(Roles.GOVERNANCE_ROLE) {
+    // check for address zero is intentionally removed to allow zero address be set to deactivate kyc if needed
+    kycId = _kycId;
   }
 }
