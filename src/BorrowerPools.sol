@@ -474,7 +474,7 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     address borrower = _msgSender();
     if (hasRole(Roles.TREASURY_ROLE, _msgSender())) borrower = to;
 
-    bytes32 poolHash = borrowerAuthorizedPools[_msgSender()];
+    bytes32 poolHash = borrowerAuthorizedPools[borrower];
     Types.Pool storage pool = pools[poolHash];
     if (pool.state.closed) {
       revert Errors.BP_POOL_CLOSED();
