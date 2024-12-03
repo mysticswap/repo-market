@@ -35,6 +35,9 @@ library Types {
     bytes32 POOL_HASH;
     address UNDERLYING_TOKEN;
     uint8 TOKEN_DECIMALS;
+    address COLLATERAL_TOKEN;
+    uint8 COLLATERAL_TOKEN_DECIMALS;
+    uint128 LTV;
     ILendingPool YIELD_PROVIDER;
     uint128 MIN_RATE;
     uint128 MAX_RATE;

@@ -2,30 +2,30 @@
 pragma solidity ^0.8.0;
 
 interface ILendingPool {
-  /**
-   * @dev Emitted on deposit()
-   * @param reserve The address of the underlying asset of the reserve
-   * @param user The address initiating the deposit
-   * @param onBehalfOf The beneficiary of the deposit, receiving the aTokens
-   * @param amount The amount deposited
-   * @param referral The referral code used
-   **/
-  event Deposit(
-    address indexed reserve,
-    address user,
-    address indexed onBehalfOf,
-    uint256 amount,
-    uint16 indexed referral
-  );
+  // /**
+  //  * @dev Emitted on deposit()
+  //  * @param reserve The address of the underlying asset of the reserve
+  //  * @param user The address initiating the deposit
+  //  * @param onBehalfOf The beneficiary of the deposit, receiving the aTokens
+  //  * @param amount The amount deposited
+  //  * @param referral The referral code used
+  //  **/
+  // event Deposit(
+  //   address indexed reserve,
+  //   address user,
+  //   address indexed onBehalfOf,
+  //   uint256 amount,
+  //   uint16 indexed referral
+  // );
 
-  /**
-   * @dev Emitted on withdraw()
-   * @param reserve The address of the underlyng asset being withdrawn
-   * @param user The address initiating the withdrawal, owner of aTokens
-   * @param to Address that will receive the underlying
-   * @param amount The amount to be withdrawn
-   **/
-  event Withdraw(address indexed reserve, address indexed user, address indexed to, uint256 amount);
+  // /**
+  //  * @dev Emitted on withdraw()
+  //  * @param reserve The address of the underlyng asset being withdrawn
+  //  * @param user The address initiating the withdrawal, owner of aTokens
+  //  * @param to Address that will receive the underlying
+  //  * @param amount The amount to be withdrawn
+  //  **/
+  // event Withdraw(address indexed reserve, address indexed user, address indexed to, uint256 amount);
 
   /**
    * @dev Deposits an `amount` of underlying asset into the reserve, receiving in return overlying aTokens.

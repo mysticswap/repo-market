@@ -54,40 +54,40 @@ describe('Borrower Pools - Parameters', function () {
     const isEarlyRepay = await user.BorrowerPools.isEarlyRepay(poolHash);
     expect(isEarlyRepay).to.be.true;
   });
-  it('Setting max borrowable amount with an address without governance role should revert', async () => {
-    const newMaxBorrowableAmount = poolParameters.maxBorrowableAmount.add(1);
-    await expect(
-      user.BorrowerPools.setMaxBorrowableAmount(
-        newMaxBorrowableAmount,
-        poolHash
-      )
-    ).to.be.revertedWith(
-      `AccessControl: account ${user.address.toLowerCase()} is missing role 0x71840dc4906352362b0cdaf79870196c8e42acafade72d5d5a6d59291253ceb1`
-    );
-  });
-  it('Setting max borrowable amount for a pool with an inactive borrower should revert', async () => {
-    const newMaxBorrowableAmount = poolParameters.maxBorrowableAmount.add(1);
-    const inactiveBorrower = keccak256(
-      defaultAbiCoder.encode(['string'], ['Inactive Borrower'])
-    );
-    await expect(
-      governanceUser.BorrowerPools.setMaxBorrowableAmount(
-        newMaxBorrowableAmount,
-        inactiveBorrower
-      )
-    ).to.be.revertedWith('PC_POOL_NOT_ACTIVE');
-  });
-  it('Setting max borrowable amount with valid data should pass', async () => {
-    const newMaxBorrowableAmount = poolParameters.maxBorrowableAmount.add(1);
-    await expect(
-      governanceUser.BorrowerPools.setMaxBorrowableAmount(
-        newMaxBorrowableAmount,
-        poolHash
-      )
-    ).to.emit(governanceUser.BorrowerPools, 'SetMaxBorrowableAmount');
-    poolParameters = await BorrowerPools.getPoolParameters(poolHash);
-    expect(poolParameters.maxBorrowableAmount).to.equal(newMaxBorrowableAmount);
-  });
+  // it('Setting max borrowable amount with an address without governance role should revert', async () => {
+  //   const newMaxBorrowableAmount = poolParameters.maxBorrowableAmount.add(1);
+  //   await expect(
+  //     user.BorrowerPools.setMaxBorrowableAmount(
+  //       newMaxBorrowableAmount,
+  //       poolHash
+  //     )
+  //   ).to.be.revertedWith(
+  //     `AccessControl: account ${user.address.toLowerCase()} is missing role 0x71840dc4906352362b0cdaf79870196c8e42acafade72d5d5a6d59291253ceb1`
+  //   );
+  // });
+  // it('Setting max borrowable amount for a pool with an inactive borrower should revert', async () => {
+  //   const newMaxBorrowableAmount = poolParameters.maxBorrowableAmount.add(1);
+  //   const inactiveBorrower = keccak256(
+  //     defaultAbiCoder.encode(['string'], ['Inactive Borrower'])
+  //   );
+  //   await expect(
+  //     governanceUser.BorrowerPools.setMaxBorrowableAmount(
+  //       newMaxBorrowableAmount,
+  //       inactiveBorrower
+  //     )
+  //   ).to.be.revertedWith('PC_POOL_NOT_ACTIVE');
+  // });
+  // it('Setting max borrowable amount with valid data should pass', async () => {
+  //   const newMaxBorrowableAmount = poolParameters.maxBorrowableAmount.add(1);
+  //   await expect(
+  //     governanceUser.BorrowerPools.setMaxBorrowableAmount(
+  //       newMaxBorrowableAmount,
+  //       poolHash
+  //     )
+  //   ).to.emit(governanceUser.BorrowerPools, 'SetMaxBorrowableAmount');
+  //   poolParameters = await BorrowerPools.getPoolParameters(poolHash);
+  //   expect(poolParameters.maxBorrowableAmount).to.equal(newMaxBorrowableAmount);
+  // });
   it('Setting liquidity rewards distribution rate with an address without governance role should revert', async () => {
     const newLiquidityRewardsDistributionRate =
       poolParameters.liquidityRewardsDistributionRate.add(1);
@@ -130,49 +130,49 @@ describe('Borrower Pools - Parameters', function () {
       newLiquidityRewardsDistributionRate
     );
   });
-  it('Setting establishment fee rate with an address without governance role should revert', async () => {
-    const newEstablishmentFeeRate = poolFeeRates.establishmentFeeRate.add(1);
-    await expect(
-      user.BorrowerPools.setEstablishmentFeeRate(
-        newEstablishmentFeeRate,
-        poolHash
-      )
-    ).to.be.revertedWith(
-      `AccessControl: account ${user.address.toLowerCase()} is missing role 0x71840dc4906352362b0cdaf79870196c8e42acafade72d5d5a6d59291253ceb1`
-    );
-  });
-  it('Setting establishment fee rate for a pool with an inactive borrower should revert', async () => {
-    const newEstablishmentFeeRate = poolFeeRates.establishmentFeeRate.add(1);
-    const inactiveBorrower = keccak256(
-      defaultAbiCoder.encode(['string'], ['Inactive Borrower'])
-    );
-    await expect(
-      governanceUser.BorrowerPools.setEstablishmentFeeRate(
-        newEstablishmentFeeRate,
-        inactiveBorrower
-      )
-    ).to.be.revertedWith('PC_POOL_NOT_ACTIVE');
-  });
-  it('Setting establishment fee rate too high should revert', async () => {
-    const newEstablishmentFeeRate = parseEther('2');
-    await expect(
-      governanceUser.BorrowerPools.setEstablishmentFeeRate(
-        newEstablishmentFeeRate,
-        poolHash
-      )
-    ).to.be.revertedWith('PC_ESTABLISHMENT_FEES_TOO_HIGH');
-  });
-  it('Setting establishment fee rate with valid data should pass', async () => {
-    const newEstablishmentFeeRate = poolFeeRates.establishmentFeeRate.add(1);
-    await expect(
-      governanceUser.BorrowerPools.setEstablishmentFeeRate(
-        newEstablishmentFeeRate,
-        poolHash
-      )
-    ).to.emit(governanceUser.BorrowerPools, 'SetEstablishmentFeeRate');
-    poolFeeRates = await BorrowerPools.getPoolFeeRates(poolHash);
-    expect(poolFeeRates.establishmentFeeRate).to.equal(newEstablishmentFeeRate);
-  });
+  // it('Setting establishment fee rate with an address without governance role should revert', async () => {
+  //   const newEstablishmentFeeRate = poolFeeRates.establishmentFeeRate.add(1);
+  //   await expect(
+  //     user.BorrowerPools.setEstablishmentFeeRate(
+  //       newEstablishmentFeeRate,
+  //       poolHash
+  //     )
+  //   ).to.be.revertedWith(
+  //     `AccessControl: account ${user.address.toLowerCase()} is missing role 0x71840dc4906352362b0cdaf79870196c8e42acafade72d5d5a6d59291253ceb1`
+  //   );
+  // });
+  // it('Setting establishment fee rate for a pool with an inactive borrower should revert', async () => {
+  //   const newEstablishmentFeeRate = poolFeeRates.establishmentFeeRate.add(1);
+  //   const inactiveBorrower = keccak256(
+  //     defaultAbiCoder.encode(['string'], ['Inactive Borrower'])
+  //   );
+  //   await expect(
+  //     governanceUser.BorrowerPools.setEstablishmentFeeRate(
+  //       newEstablishmentFeeRate,
+  //       inactiveBorrower
+  //     )
+  //   ).to.be.revertedWith('PC_POOL_NOT_ACTIVE');
+  // });
+  // it('Setting establishment fee rate too high should revert', async () => {
+  //   const newEstablishmentFeeRate = parseEther('2');
+  //   await expect(
+  //     governanceUser.BorrowerPools.setEstablishmentFeeRate(
+  //       newEstablishmentFeeRate,
+  //       poolHash
+  //     )
+  //   ).to.be.revertedWith('PC_ESTABLISHMENT_FEES_TOO_HIGH');
+  // });
+  // it('Setting establishment fee rate with valid data should pass', async () => {
+  //   const newEstablishmentFeeRate = poolFeeRates.establishmentFeeRate.add(1);
+  //   await expect(
+  //     governanceUser.BorrowerPools.setEstablishmentFeeRate(
+  //       newEstablishmentFeeRate,
+  //       poolHash
+  //     )
+  //   ).to.emit(governanceUser.BorrowerPools, 'SetEstablishmentFeeRate');
+  //   poolFeeRates = await BorrowerPools.getPoolFeeRates(poolHash);
+  //   expect(poolFeeRates.establishmentFeeRate).to.equal(newEstablishmentFeeRate);
+  // });
   it('Setting repayment fee rate with an address without governance role should revert', async () => {
     const newRepaymentFeeRate = poolFeeRates.repaymentFeeRate.add(1);
     await expect(

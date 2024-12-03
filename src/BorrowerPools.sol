@@ -5,8 +5,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "./interfaces/IBorrowerPools.sol";
-
-import "./extensions/AaveILendingPool.sol";
 import "./lib/Errors.sol";
 import "./lib/PoolLogic.sol";
 import "./lib/Scaling.sol";
@@ -15,10 +13,13 @@ import "./lib/Uint128WadRayMath.sol";
 
 import "./PoolsController.sol";
 
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+
 contract BorrowerPools is PoolsController, IBorrowerPools {
   using PoolLogic for Types.Pool;
   using Scaling for uint128;
   using Uint128WadRayMath for uint128;
+  address public kycId;
 
   function initialize(address governance) public initializer {
     _initialize();
@@ -30,6 +31,12 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     _grantRole(Roles.GOVERNANCE_ROLE, governance);
     _setRoleAdmin(Roles.BORROWER_ROLE, Roles.GOVERNANCE_ROLE);
     _setRoleAdmin(Roles.POSITION_ROLE, Roles.GOVERNANCE_ROLE);
+    _setRoleAdmin(Roles.TREASURY_ROLE, Roles.GOVERNANCE_ROLE);
+  }
+
+  modifier onlyKYCed() {
+    if (kycId != address(0) && IERC721(kycId).balanceOf(msg.sender) == 0) revert Errors.NOT_KYCED();
+    _;
   }
 
   // VIEW METHODS
@@ -73,7 +80,8 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       uint128 bondsQuantity,
       uint128 adjustedPendingAmount,
       uint128 atlendisLiquidityRatio,
-      uint128 accruedFees
+      uint128 accruedFees,
+      uint128 lastFeeDistributionTimestamp
     )
   {
     Types.Tick storage tick = pools[poolHash].ticks[rate];
@@ -83,24 +91,9 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       tick.bondsQuantity,
       tick.adjustedPendingAmount,
       tick.atlendisLiquidityRatio,
-      tick.accruedFees
+      tick.accruedFees,
+      tick.lastFeeDistributionTimestamp
     );
-  }
-
-  /**
-   * @notice Returns the timestamp of the last fee distribution to the tick
-   * @param pool The identifier of the pool pool
-   * @param rate The tick rate from which to get data
-   * @return lastFeeDistributionTimestamp Timestamp of the last fee's distribution to the tick
-   **/
-  function getTickLastUpdate(string calldata pool, uint128 rate)
-    public
-    view
-    override
-    returns (uint128 lastFeeDistributionTimestamp)
-  {
-    Types.Tick storage tick = pools[keccak256(abi.encode(pool))].ticks[rate];
-    return tick.lastFeeDistributionTimestamp;
   }
 
   /**
@@ -470,8 +463,18 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
    * @param to The address to which the borrowed funds should be sent.
    * @param loanAmount The total amount of the loan
    **/
-  function borrow(address to, uint128 loanAmount) external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
-    bytes32 poolHash = borrowerAuthorizedPools[_msgSender()];
+  function borrow(address to, uint128 loanAmount)
+    external
+    override
+    whenNotPaused
+    onlyKYCed
+    onlyRole(Roles.BORROWER_ROLE)
+  {
+    // this is to fix the use case of calling from the treasury
+    address borrower = _msgSender();
+    if (hasRole(Roles.TREASURY_ROLE, _msgSender())) borrower = to;
+
+    bytes32 poolHash = borrowerAuthorizedPools[borrower];
     Types.Pool storage pool = pools[poolHash];
     if (pool.state.closed) {
       revert Errors.BP_POOL_CLOSED();
@@ -531,10 +534,11 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
   }
 
   /**
-   * @notice Repays a currently outstanding bonds of the given pool.
+   * @notice Repays a currently outstanding bonds of the given pool for a borrower
    **/
-  function repay() external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
-    bytes32 poolHash = borrowerAuthorizedPools[_msgSender()];
+  function repay() external override whenNotPaused onlyKYCed onlyRole(Roles.BORROWER_ROLE) {
+    address borrower = _msgSender();
+    bytes32 poolHash = borrowerAuthorizedPools[borrower];
     Types.Pool storage pool = pools[poolHash];
     if (pool.state.defaulted) {
       revert Errors.BP_POOL_DEFAULTED();
@@ -545,6 +549,11 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     bool earlyRepay = pool.state.currentMaturity > block.timestamp;
     if (earlyRepay && !pool.parameters.EARLY_REPAY) {
       revert Errors.BP_EARLY_REPAY_NOT_ACTIVATED();
+    }
+
+    if (borrower != _msgSender() && block.timestamp < (pool.state.currentMaturity + pool.parameters.REPAYMENT_PERIOD)) {
+      // liquidator cannot liquidate early or during repayment period
+      revert Errors.BP_LOAN_ONGOING();
     }
 
     // collectFees should be called before changing pool global state as fee collection depends on it
@@ -617,7 +626,13 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
    * is distributed to liquidity providers at the pre-defined distribution rate.
    * @param amount Amount of tokens that will be add up to the pool's liquidity rewards reserve
    **/
-  function topUpLiquidityRewards(uint128 amount) external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
+  function topUpLiquidityRewards(uint128 amount)
+    external
+    override
+    onlyKYCed
+    whenNotPaused
+    onlyRole(Roles.BORROWER_ROLE)
+  {
     Types.Pool storage pool = pools[borrowerAuthorizedPools[_msgSender()]];
     uint128 normalizedAmount = amount.scaleToWad(pool.parameters.TOKEN_DECIMALS);
 
@@ -641,19 +656,19 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
   /**
    * @notice Collect yield provider fees as well as liquidity rewards for the target tick
    * @param poolHash The identifier of the pool
+   * @param rate The rate is target tick, rate = 0 means collect entire fees
    **/
-  function collectFeesForTick(bytes32 poolHash, uint128 rate) external override whenNotPaused {
+  function collectFees(bytes32 poolHash, uint128 rate) external override whenNotPaused {
     Types.Pool storage pool = pools[poolHash];
-    pool.collectFees(rate);
+    if (rate == 0) {
+      pool.collectFees();
+    } else {
+      pool.collectFees(rate);
+    }
   }
 
-  /**
-   * @notice Collect yield provider fees as well as liquidity rewards for the whole pool
-   * Iterates over all pool initialized ticks
-   * @param poolHash The identifier of the pool
-   **/
-  function collectFees(bytes32 poolHash) external override whenNotPaused {
-    Types.Pool storage pool = pools[poolHash];
-    pool.collectFees();
+  function activateKYC(address _kycId) external onlyRole(Roles.GOVERNANCE_ROLE) {
+    // check for address zero is intentionally removed to allow zero address be set to deactivate kyc if needed
+    kycId = _kycId;
   }
 }

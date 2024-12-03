@@ -195,7 +195,9 @@ interface IPoolsController {
   struct PoolCreationParams {
     bytes32 poolHash;
     address underlyingToken;
+    address collateralToken;
     ILendingPool yieldProvider;
+    uint128 ltv;
     uint128 minRate;
     uint128 maxRate;
     uint128 rateSpacing;
@@ -247,22 +249,22 @@ interface IPoolsController {
   /**
    * @notice Set the maximum amount of tokens that can be borrowed in the target pool
    **/
-  function setMaxBorrowableAmount(uint128 maxTokenDeposit, bytes32 poolHash) external;
+  // function setMaxBorrowableAmount(uint128 maxTokenDeposit, bytes32 poolHash) external;
 
   /**
    * @notice Set the pool liquidity rewards distribution rate
    **/
-  function setLiquidityRewardsDistributionRate(uint128 distributionRate, bytes32 poolHash) external;
+  // function setLiquidityRewardsDistributionRate(uint128 distributionRate, bytes32 poolHash) external;
 
   /**
    * @notice Set the pool establishment protocol fee rate
    **/
-  function setEstablishmentFeeRate(uint128 establishmentFeeRate, bytes32 poolHash) external;
+  // function setEstablishmentFeeRate(uint128 establishmentFeeRate, bytes32 poolHash) external;
 
   /**
    * @notice Set the pool repayment protocol fee rate
    **/
-  function setRepaymentFeeRate(uint128 repaymentFeeRate, bytes32 poolHash) external;
+  // function setRepaymentFeeRate(uint128 repaymentFeeRate, bytes32 poolHash) external;
 
   /**
    * @notice Withdraws protocol fees to a target address
