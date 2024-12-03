@@ -15,11 +15,13 @@ import "./lib/Roles.sol";
 import "./lib/Types.sol";
 
 import "./interfaces/IPoolsController.sol";
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 
 abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeable, IPoolsController {
   using PoolLogic for Types.Pool;
   using Scaling for uint128;
   using Uint128WadRayMath for uint128;
+  address public kycId;
 
   // borrower address to pool hash
   mapping(address => bytes32) public borrowerAuthorizedPools;
@@ -201,7 +203,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     protocolFees[poolHash] -= normalizedAmount;
     pools[poolHash].parameters.YIELD_PROVIDER.withdraw(pools[poolHash].parameters.UNDERLYING_TOKEN, amount, to);
 
-    emit ClaimProtocolFees(poolHash, normalizedAmount, to);
+    // emit ClaimProtocolFees(poolHash, normalizedAmount, to);
   }
 
   /**
@@ -259,7 +261,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
 
     if (pools[params.poolHash].parameters.LIQUIDITY_REWARDS_ACTIVATION_THRESHOLD == 0) {
       pools[params.poolHash].state.active = true;
-      emit PoolActivated(pools[params.poolHash].parameters.POOL_HASH);
+      // emit PoolActivated(pools[params.poolHash].parameters.POOL_HASH);
     }
   }
 
@@ -304,9 +306,13 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     if (borrowerAuthorizedPools[borrowerAddress] != bytes32(0)) {
       revert Errors.PC_BORROWER_ALREADY_AUTHORIZED();
     }
+    if (kycId != address(0) && IERC721(kycId).balanceOf(msg.sender) == 0) {
+      revert Errors.NOT_KYCED();
+    }
+
     grantRole(Roles.BORROWER_ROLE, borrowerAddress);
     borrowerAuthorizedPools[borrowerAddress] = poolHash;
-    emit BorrowerAllowed(borrowerAddress, poolHash);
+    // emit BorrowerAllowed(borrowerAddress, poolHash);
   }
 
   /**
@@ -329,7 +335,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     }
     revokeRole(Roles.BORROWER_ROLE, borrowerAddress);
     delete borrowerAuthorizedPools[borrowerAddress];
-    emit BorrowerDisallowed(borrowerAddress, poolHash);
+    // emit BorrowerDisallowed(borrowerAddress, poolHash);
   }
 
   /**
@@ -368,7 +374,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
         to
       );
     }
-    emit PoolClosed(poolHash, remainingNormalizedLiquidityRewardsReserve);
+    // emit PoolClosed(poolHash, remainingNormalizedLiquidityRewardsReserve);
   }
 
   /**
@@ -391,7 +397,12 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     pool.state.defaultTimestamp = uint128(block.timestamp);
     uint128 distributedLiquidityRewards = pool.distributeLiquidityRewards();
 
-    emit Default(poolHash, distributedLiquidityRewards);
+    // emit Default(poolHash, distributedLiquidityRewards);
+  }
+
+  function activateKYC(address _kycId) external onlyRole(Roles.GOVERNANCE_ROLE) {
+    // check for address zero is intentionally removed to allow zero address be set to deactivate kyc if needed
+    kycId = _kycId;
   }
 
   // POOL PARAMETERS MANAGEMENT
