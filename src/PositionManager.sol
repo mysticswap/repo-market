@@ -44,7 +44,7 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
   }
 
   modifier onlyKYCed() {
-    if (kycId == address(0) || IERC721(kycId).balanceOf(msg.sender) > 0) revert Errors.NOT_KYCED();
+    if (kycId != address(0) && IERC721(kycId).balanceOf(msg.sender) == 0) revert Errors.NOT_KYCED();
     _;
   }
 
@@ -315,6 +315,71 @@ contract PositionManager is ERC721Upgradeable, IPositionManager {
     _positions[tokenId].bondsIssuanceIndex = newBondsIssuanceIndex;
 
     emit UpdateRate(_msgSender(), tokenId, normalizedAmount, newRate, _positions[tokenId].poolHash);
+  }
+
+  /**
+   * @notice Withdraws the amount of tokens that are deposited with the yield provider.
+   * The bonds portion of the position is not affected.
+   * @param tokenId The tokenId of the position
+   **/
+  function withdrawFor(uint128 tokenId, address to) external {
+    if (ownerOf(tokenId) != to) {
+      revert Errors.POS_MGMT_ONLY_OWNER();
+    }
+
+    if (!managers[_msgSender()]) {
+      revert Errors.POS_NOT_ALLOWED();
+    }
+
+    if (_positions[tokenId].creationTimestamp == block.timestamp) {
+      revert Errors.POS_TIMELOCK();
+    }
+    uint256 poolCurrentMaturity = pools.getPoolMaturity(_positions[tokenId].poolHash);
+    if (
+      !((_positions[tokenId].remainingBonds == 0) ||
+        ((block.timestamp >= _positions[tokenId].bondsMaturity) &&
+          (_positions[tokenId].bondsMaturity != poolCurrentMaturity)))
+    ) {
+      revert Errors.POS_POSITION_ONLY_IN_BONDS();
+    }
+
+    (
+      uint128 adjustedAmountToWithdraw,
+      uint128 depositedAmountToWithdraw,
+      uint128 remainingBondsQuantity,
+      uint128 bondsMaturity
+    ) = pools.getWithdrawAmounts(
+        _positions[tokenId].poolHash,
+        _positions[tokenId].rate,
+        _positions[tokenId].adjustedBalance,
+        _positions[tokenId].bondsIssuanceIndex
+      );
+
+    _positions[tokenId].adjustedBalance -= depositedAmountToWithdraw;
+    _positions[tokenId].remainingBonds = remainingBondsQuantity;
+    _positions[tokenId].bondsMaturity = bondsMaturity;
+
+    uint128 normalizedWithdrawnDeposit = pools.withdraw(
+      _positions[tokenId].poolHash,
+      _positions[tokenId].rate,
+      adjustedAmountToWithdraw,
+      _positions[tokenId].bondsIssuanceIndex,
+      to
+    );
+
+    emit Withdraw(
+      to,
+      tokenId,
+      normalizedWithdrawnDeposit,
+      remainingBondsQuantity,
+      _positions[tokenId].rate,
+      _positions[tokenId].poolHash
+    );
+
+    if (_positions[tokenId].remainingBonds == 0) {
+      _burn(tokenId);
+      delete _positions[tokenId];
+    }
   }
 
   /**

@@ -306,7 +306,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     }
     grantRole(Roles.BORROWER_ROLE, borrowerAddress);
     borrowerAuthorizedPools[borrowerAddress] = poolHash;
-    emit BorrowerAllowed(borrowerAddress, poolHash);
+    // emit BorrowerAllowed(borrowerAddress, poolHash);
   }
 
   /**
@@ -329,7 +329,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     }
     revokeRole(Roles.BORROWER_ROLE, borrowerAddress);
     delete borrowerAuthorizedPools[borrowerAddress];
-    emit BorrowerDisallowed(borrowerAddress, poolHash);
+    // emit BorrowerDisallowed(borrowerAddress, poolHash);
   }
 
   /**

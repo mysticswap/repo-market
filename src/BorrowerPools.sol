@@ -31,10 +31,11 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     _grantRole(Roles.GOVERNANCE_ROLE, governance);
     _setRoleAdmin(Roles.BORROWER_ROLE, Roles.GOVERNANCE_ROLE);
     _setRoleAdmin(Roles.POSITION_ROLE, Roles.GOVERNANCE_ROLE);
+    _setRoleAdmin(Roles.TREASURY_ROLE, Roles.GOVERNANCE_ROLE);
   }
 
   modifier onlyKYCed() {
-    if (kycId == address(0) || IERC721(kycId).balanceOf(msg.sender) > 0) revert Errors.NOT_KYCED();
+    if (kycId != address(0) && IERC721(kycId).balanceOf(msg.sender) == 0) revert Errors.NOT_KYCED();
     _;
   }
 
@@ -469,6 +470,10 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     onlyKYCed
     onlyRole(Roles.BORROWER_ROLE)
   {
+    // this is to fix the use case of calling from the treasury
+    address borrower = _msgSender();
+    if (hasRole(Roles.TREASURY_ROLE, _msgSender())) borrower = to;
+
     bytes32 poolHash = borrowerAuthorizedPools[_msgSender()];
     Types.Pool storage pool = pools[poolHash];
     if (pool.state.closed) {
