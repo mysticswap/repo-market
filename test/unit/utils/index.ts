@@ -22,6 +22,7 @@ import {
 import {Deployer, Mocks, User} from '../../utils/types';
 import {Treasury} from '../../../typechain/Treasury';
 import {Pool} from '../../../typechain/Pool';
+import {parseEther} from 'ethers/lib/utils';
 
 //Functional setup for Position Contract Tests :
 //Deploying Contracts, mocking returned values from Aave LendingPool Contract, returning users
@@ -79,18 +80,21 @@ export const setupTestContracts = async (
   await mocks.DepositToken1.mock.transferFrom.returns(true);
   await mocks.DepositToken1.mock.transfer.returns(true);
   await mocks.DepositToken1.mock.decimals.returns(18);
+  await mocks.DepositToken1.mock.balanceOf.returns(parseEther('100000000'));
 
   await mocks.DepositToken2.mock.allowance.returns(maxBorrowableAmount);
   await mocks.DepositToken2.mock.approve.returns(true);
   await mocks.DepositToken2.mock.transferFrom.returns(true);
   await mocks.DepositToken2.mock.transfer.returns(true);
   await mocks.DepositToken2.mock.decimals.returns(18);
+  await mocks.DepositToken2.mock.balanceOf.returns(parseEther('100000000'));
 
   await mocks.DepositToken3.mock.allowance.returns(maxBorrowableAmount);
   await mocks.DepositToken3.mock.approve.returns(true);
   await mocks.DepositToken3.mock.transferFrom.returns(true);
   await mocks.DepositToken3.mock.transfer.returns(true);
   await mocks.DepositToken3.mock.decimals.returns(18);
+  await mocks.DepositToken3.mock.balanceOf.returns(parseEther('100000000'));
 
   await deployedBorrowerPools.grantRole(
     POSITION_ROLE,

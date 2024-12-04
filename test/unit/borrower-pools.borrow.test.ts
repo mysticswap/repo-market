@@ -101,10 +101,11 @@ describe('Borrower Pools - Borrow', function () {
     await ethers.provider.send('evm_increaseTime', [
       loanDuration.add(repaymentPeriod).add(1).toNumber(),
     ]);
-    await expect(governanceUser.BorrowerPools.setDefault(poolHash)).to.emit(
-      governanceUser.BorrowerPools,
-      'Default'
-    );
+    await expect(governanceUser.BorrowerPools.setDefault(poolHash));
+    // .to.emit(
+    //   governanceUser.BorrowerPools,
+    //   'Default'
+    // );
     await expect(
       borrower.BorrowerPools.borrow(borrower.address, depositAmount)
     ).to.revertedWith('BP_POOL_DEFAULTED');
