@@ -98,10 +98,19 @@ Add ETHERSCAN_KEY to your .env
 Note: A different key is required weather verifying contracts on (Mainnet / Kovan) vs. (Polygon / Mumbai)
 Two packages are included in this repository to provide source code verification:
 
- * hardhat-deploy
+- hardhat-deploy
 
 Run `yarn etherscan-verify <network>`
 
- * hardhat-etherscan
+- hardhat-etherscan
 
 Run `npx hardhat verify --network <network> CONTRACT_ADDRESS`
+
+## Files in scope for audit
+
+- BorrowerPools.sol
+- PoolsController.sol
+- PositionManager.sol
+- PoolWrapper.sol
+- Treasury.sol
+- KYCId.sol
