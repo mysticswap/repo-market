@@ -374,7 +374,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
         to
       );
     }
-    // emit PoolClosed(poolHash, remainingNormalizedLiquidityRewardsReserve);
+    emit PoolClosed(poolHash, remainingNormalizedLiquidityRewardsReserve);
   }
 
   /**
@@ -397,7 +397,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     pool.state.defaultTimestamp = uint128(block.timestamp);
     uint128 distributedLiquidityRewards = pool.distributeLiquidityRewards();
 
-    // emit Default(poolHash, distributedLiquidityRewards);
+    emit Default(poolHash, distributedLiquidityRewards);
   }
 
   function activateKYC(address _kycId) external onlyRole(Roles.GOVERNANCE_ROLE) {

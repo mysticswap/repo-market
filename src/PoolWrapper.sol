@@ -63,7 +63,7 @@ contract Pool is Ownable, ILendingPool {
 
     // send to treasury if asset is supported
     IERC20(token).approve(address(treasury), amount);
-    if (treasury.isSupportedAsset(token)) {
+    if (address(treasury) != address(0) && treasury.isSupportedAsset(token)) {
       treasury.depositAsset(token, amount);
     }
 
@@ -91,6 +91,8 @@ contract Pool is Ownable, ILendingPool {
 
     // Update total reserves
     totalReserves[token] = totalReserves[token].sub(amount);
+
+    require(IERC20(token).balanceOf(address(this)) >= totalWithdrawalAmount, "Insufficient amount");
 
     // Transfer tokens back to user
     IERC20(token).transfer(to, totalWithdrawalAmount);
@@ -129,7 +131,7 @@ contract Pool is Ownable, ILendingPool {
   }
 
   function updateTreasury(address _treasury) external onlyOwner {
-    require(_treasury != address(0), "Invalid treasury");
+    // allow zero address for treasury to disable the treasury if needed
 
     treasury = ITreasury(_treasury);
     emit TeasuryUpdated(_treasury);
