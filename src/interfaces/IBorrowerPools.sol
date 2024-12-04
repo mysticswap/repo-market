@@ -230,19 +230,9 @@ interface IBorrowerPools {
       uint128 bondsQuantity,
       uint128 adjustedPendingAmount,
       uint128 atlendisLiquidityRatio,
-      uint128 accruedFees
+      uint128 accruedFees,
+      uint128 lastFeeDistributionTimestamp
     );
-
-  /**
-   * @notice Returns the timestamp of the last fee distribution to the tick
-   * @param poolHash The identifier of the pool
-   * @param rate The tick rate from which to get data
-   * @return lastFeeDistributionTimestamp Timestamp of the last fee's distribution to the tick
-   **/
-  function getTickLastUpdate(string calldata poolHash, uint128 rate)
-    external
-    view
-    returns (uint128 lastFeeDistributionTimestamp);
 
   /**
    * @notice Returns the current state of the pool's parameters
@@ -436,12 +426,5 @@ interface IBorrowerPools {
    * @notice Collect yield provider fees as well as liquidity rewards for the target tick
    * @param poolHash The identifier of the pool
    **/
-  function collectFeesForTick(bytes32 poolHash, uint128 rate) external;
-
-  /**
-   * @notice Collect yield provider fees as well as liquidity rewards for the whole pool
-   * Iterates over all pool initialized ticks
-   * @param poolHash The identifier of the pool
-   **/
-  function collectFees(bytes32 poolHash) external;
+  function collectFees(bytes32 poolHash, uint128 rate) external;
 }

@@ -58,4 +58,6 @@ library Errors {
   error MATH_MULTIPLICATION_OVERFLOW(); // "The multiplication would result in a overflow";
   error MATH_ADDITION_OVERFLOW(); // "The addition would result in a overflow";
   error MATH_DIVISION_BY_ZERO(); // "The division would result in a divzion by zero";
+
+  error NOT_KYCED();
 }

@@ -15,11 +15,13 @@ import "./lib/Roles.sol";
 import "./lib/Types.sol";
 
 import "./interfaces/IPoolsController.sol";
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 
 abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeable, IPoolsController {
   using PoolLogic for Types.Pool;
   using Scaling for uint128;
   using Uint128WadRayMath for uint128;
+  address public kycId;
 
   // borrower address to pool hash
   mapping(address => bytes32) public borrowerAuthorizedPools;
@@ -201,7 +203,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     protocolFees[poolHash] -= normalizedAmount;
     pools[poolHash].parameters.YIELD_PROVIDER.withdraw(pools[poolHash].parameters.UNDERLYING_TOKEN, amount, to);
 
-    emit ClaimProtocolFees(poolHash, normalizedAmount, to);
+    // emit ClaimProtocolFees(poolHash, normalizedAmount, to);
   }
 
   /**
@@ -231,6 +233,9 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     pools[params.poolHash].parameters = Types.PoolParameters({
       POOL_HASH: params.poolHash,
       UNDERLYING_TOKEN: params.underlyingToken,
+      COLLATERAL_TOKEN_DECIMALS: IERC20PartialDecimals(params.collateralToken).decimals(),
+      COLLATERAL_TOKEN: params.collateralToken,
+      LTV: params.ltv,
       TOKEN_DECIMALS: IERC20PartialDecimals(params.underlyingToken).decimals(),
       YIELD_PROVIDER: params.yieldProvider,
       MIN_RATE: params.minRate,
@@ -256,7 +261,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
 
     if (pools[params.poolHash].parameters.LIQUIDITY_REWARDS_ACTIVATION_THRESHOLD == 0) {
       pools[params.poolHash].state.active = true;
-      emit PoolActivated(pools[params.poolHash].parameters.POOL_HASH);
+      // emit PoolActivated(pools[params.poolHash].parameters.POOL_HASH);
     }
   }
 
@@ -301,9 +306,13 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     if (borrowerAuthorizedPools[borrowerAddress] != bytes32(0)) {
       revert Errors.PC_BORROWER_ALREADY_AUTHORIZED();
     }
+    if (kycId != address(0) && IERC721(kycId).balanceOf(msg.sender) == 0) {
+      revert Errors.NOT_KYCED();
+    }
+
     grantRole(Roles.BORROWER_ROLE, borrowerAddress);
     borrowerAuthorizedPools[borrowerAddress] = poolHash;
-    emit BorrowerAllowed(borrowerAddress, poolHash);
+    // emit BorrowerAllowed(borrowerAddress, poolHash);
   }
 
   /**
@@ -326,7 +335,7 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     }
     revokeRole(Roles.BORROWER_ROLE, borrowerAddress);
     delete borrowerAuthorizedPools[borrowerAddress];
-    emit BorrowerDisallowed(borrowerAddress, poolHash);
+    // emit BorrowerDisallowed(borrowerAddress, poolHash);
   }
 
   /**
@@ -391,73 +400,47 @@ abstract contract PoolsController is AccessControlUpgradeable, PausableUpgradeab
     emit Default(poolHash, distributedLiquidityRewards);
   }
 
+  function activateKYC(address _kycId) external onlyRole(Roles.GOVERNANCE_ROLE) {
+    // check for address zero is intentionally removed to allow zero address be set to deactivate kyc if needed
+    kycId = _kycId;
+  }
+
   // POOL PARAMETERS MANAGEMENT
-  /**
-   * @notice Set the maximum amount of tokens that can be borrowed in the target pool
-   **/
-  function setMaxBorrowableAmount(uint128 maxBorrowableAmount, bytes32 poolHash)
-    external
-    override
-    onlyRole(Roles.GOVERNANCE_ROLE)
-  {
-    if (pools[poolHash].parameters.POOL_HASH != poolHash) {
-      revert Errors.PC_POOL_NOT_ACTIVE();
-    }
-    pools[poolHash].parameters.MAX_BORROWABLE_AMOUNT = maxBorrowableAmount;
-
-    emit SetMaxBorrowableAmount(maxBorrowableAmount, poolHash);
-  }
 
   /**
-   * @notice Set the pool liquidity rewards distribution rate
-   **/
-  function setLiquidityRewardsDistributionRate(uint128 distributionRate, bytes32 poolHash)
-    external
-    override
-    onlyRole(Roles.GOVERNANCE_ROLE)
-  {
-    if (pools[poolHash].parameters.POOL_HASH != poolHash) {
-      revert Errors.PC_POOL_NOT_ACTIVE();
-    }
-    pools[poolHash].parameters.LIQUIDITY_REWARDS_DISTRIBUTION_RATE = distributionRate;
-
-    emit SetLiquidityRewardsDistributionRate(distributionRate, poolHash);
-  }
-
-  /**
-   * @notice Set the pool establishment protocol fee rate
-   **/
-  function setEstablishmentFeeRate(uint128 establishmentFeeRate, bytes32 poolHash)
-    external
-    override
-    onlyRole(Roles.GOVERNANCE_ROLE)
-  {
+   * @notice Set various pool parameters with a single function
+   * @param paramType Type of parameter to update (0: max borrowable, 1: liquidity rewards, 2: establishment fee, 3: repayment fee)
+   * @param value New value for the parameter
+   * @param poolHash Hash of the target pool
+   */
+  function setPoolParameter(
+    uint8 paramType,
+    uint128 value,
+    bytes32 poolHash
+  ) external onlyRole(Roles.GOVERNANCE_ROLE) {
+    // Verify pool is active
     if (!pools[poolHash].state.active) {
       revert Errors.PC_POOL_NOT_ACTIVE();
     }
-    if (establishmentFeeRate > PoolLogic.WAD) {
+
+    // Additional validation for establishment fee
+    if (paramType == 2 && value > PoolLogic.WAD) {
       revert Errors.PC_ESTABLISHMENT_FEES_TOO_HIGH();
     }
 
-    pools[poolHash].parameters.ESTABLISHMENT_FEE_RATE = establishmentFeeRate;
-
-    emit SetEstablishmentFeeRate(establishmentFeeRate, poolHash);
-  }
-
-  /**
-   * @notice Set the pool repayment protocol fee rate
-   **/
-  function setRepaymentFeeRate(uint128 repaymentFeeRate, bytes32 poolHash)
-    external
-    override
-    onlyRole(Roles.GOVERNANCE_ROLE)
-  {
-    if (!pools[poolHash].state.active) {
-      revert Errors.PC_POOL_NOT_ACTIVE();
+    // Update parameter based on type
+    if (paramType == 0) {
+      pools[poolHash].parameters.MAX_BORROWABLE_AMOUNT = value;
+      // emit SetMaxBorrowableAmount(value, poolHash);
+    } else if (paramType == 1) {
+      pools[poolHash].parameters.LIQUIDITY_REWARDS_DISTRIBUTION_RATE = value;
+      // emit SetLiquidityRewardsDistributionRate(value, poolHash);
+    } else if (paramType == 2) {
+      pools[poolHash].parameters.ESTABLISHMENT_FEE_RATE = value;
+      // emit SetEstablishmentFeeRate(value, poolHash);
+    } else if (paramType == 3) {
+      pools[poolHash].parameters.REPAYMENT_FEE_RATE = value;
+      // emit SetRepaymentFeeRate(value, poolHash);
     }
-
-    pools[poolHash].parameters.REPAYMENT_FEE_RATE = repaymentFeeRate;
-
-    emit SetRepaymentFeeRate(repaymentFeeRate, poolHash);
   }
 }

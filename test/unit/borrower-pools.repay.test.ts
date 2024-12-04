@@ -29,7 +29,7 @@ import {
   secondsPerYear,
   establishmentFeeRate,
 } from '../utils/constants';
-import {PoolParameters, User} from '../utils/types';
+import {Deployer, PoolParameters, User} from '../utils/types';
 import {expect} from './helpers/chai-setup';
 import {setupTestContracts} from './utils';
 
@@ -38,7 +38,11 @@ const setup = deployments.createFixture(async () => {
 });
 
 describe('Borrower Pools - Repay', function () {
-  let positionManager: User, borrower: User, governanceUser: User;
+  let positionManager: User,
+    borrower: User,
+    governanceUser: User,
+    liquidator: User,
+    mockDeployer: Deployer;
   let BorrowerPools: BorrowerPools;
   let poolParameters: PoolParameters;
   let depositRate: BigNumber,
@@ -50,6 +54,7 @@ describe('Borrower Pools - Repay', function () {
     liquidityRewardsRate: BigNumber,
     maxBorrowableAmount: BigNumber;
   let poolToken: string;
+  let otherToken: string;
   let mockLendingPool: MockContract;
   const depositAmount: BigNumber = WAD.mul(20); //20 tokens deposited : arbitrary amount for testing purpose
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,9 +70,11 @@ describe('Borrower Pools - Repay', function () {
     const {
       deployedBorrowerPools,
       testBorrower,
+      testLiquidator,
       testPositionManager,
       governance,
       poolTokenAddress,
+      otherTokenAddress,
     } = await setupTestContracts(deployer, mocks, users);
     BorrowerPools = deployedBorrowerPools;
     poolParameters = await BorrowerPools.getPoolParameters(poolHash);
@@ -80,9 +87,12 @@ describe('Borrower Pools - Repay', function () {
     maxBorrowableAmount = poolParameters.maxBorrowableAmount;
     depositRate = minRate.add(rateSpacing); //Tokens deposited at the min_rate + rate_spacing
     positionManager = testPositionManager;
+    mockDeployer = deployer;
     borrower = testBorrower;
+    liquidator = testLiquidator;
     governanceUser = governance;
     poolToken = poolTokenAddress;
+    otherToken = otherTokenAddress;
     mockLendingPool = mocks.ILendingPool;
     checkPoolState = checkPoolUtil(borrower);
     checkPositionRepartition = checkPositionRepartitionUtil(borrower);
@@ -113,6 +123,8 @@ describe('Borrower Pools - Repay', function () {
       governanceUser.BorrowerPools.createNewPool({
         poolHash: newPoolHash,
         underlyingToken: poolToken,
+        collateralToken: otherToken,
+        ltv: 8000,
         yieldProvider: mockLendingPool.address,
         minRate: minRateInput,
         maxRate: maxRateInput,
@@ -134,7 +146,9 @@ describe('Borrower Pools - Repay', function () {
       .withArgs([
         newPoolHash,
         poolToken,
+        otherToken,
         mockLendingPool.address,
+        8000,
         minRateInput,
         maxRateInput,
         rateSpacingInput,
@@ -168,6 +182,139 @@ describe('Borrower Pools - Repay', function () {
     await expect(borrower.BorrowerPools.repay()).to.be.revertedWith(
       'BP_REPAY_NO_ACTIVE_LOAN'
     );
+  });
+  it('Repaying for a user after maturity but before maturity should revert', async function () {
+    const borrowAmount = depositAmount;
+    await positionManager.BorrowerPools.deposit(
+      depositRate,
+      poolHash,
+      poolToken,
+      positionManager.address,
+      depositAmount
+    );
+    await borrower.BorrowerPools.borrow(borrower.address, borrowAmount);
+
+    await checkPoolState(poolHash, {
+      normalizedAvailableDeposits: BigNumber.from(0),
+      lowerInterestRate: depositRate,
+      normalizedBorrowedAmount: borrowAmount,
+    });
+    await checkTickAmounts(poolHash, depositRate, {
+      adjustedTotalAmount: depositAmount.div(2),
+      adjustedRemainingAmount: BigNumber.from(0),
+      normalizedUsedAmount: depositAmount,
+      adjustedPendingDepositAmount: BigNumber.from(0),
+    });
+
+    const expectedBondsQuantity = await computeBondsQuantity(
+      depositAmount,
+      depositRate,
+      loanDuration
+    );
+    await ethers.provider.send('evm_increaseTime', [
+      loanDuration.div(2).toNumber(),
+    ]);
+    await ethers.provider.send('evm_mine', []);
+    const currentMaturity = (await BorrowerPools.getPoolState(poolHash))
+      .currentMaturity;
+    await expect(
+      liquidator.BorrowerPools.repayFor(borrower.address)
+    ).to.be.revertedWith('BP_LOAN_ONGOING');
+  });
+  it('Repaying for a user after maturity but before late repay threshold should revert', async function () {
+    const borrowAmount = depositAmount;
+    await positionManager.BorrowerPools.deposit(
+      depositRate,
+      poolHash,
+      poolToken,
+      positionManager.address,
+      depositAmount
+    );
+    await borrower.BorrowerPools.borrow(borrower.address, borrowAmount);
+
+    await checkPoolState(poolHash, {
+      normalizedAvailableDeposits: BigNumber.from(0),
+      lowerInterestRate: depositRate,
+      normalizedBorrowedAmount: borrowAmount,
+    });
+    await checkTickAmounts(poolHash, depositRate, {
+      adjustedTotalAmount: depositAmount.div(2),
+      adjustedRemainingAmount: BigNumber.from(0),
+      normalizedUsedAmount: depositAmount,
+      adjustedPendingDepositAmount: BigNumber.from(0),
+    });
+
+    const expectedBondsQuantity = await computeBondsQuantity(
+      depositAmount,
+      depositRate,
+      loanDuration
+    );
+    await ethers.provider.send('evm_increaseTime', [
+      loanDuration.toNumber() + oneSec,
+    ]);
+    await ethers.provider.send('evm_mine', []);
+    const currentMaturity = (await BorrowerPools.getPoolState(poolHash))
+      .currentMaturity;
+    await expect(
+      liquidator.BorrowerPools.repayFor(borrower.address)
+    ).to.be.revertedWith('BP_LOAN_ONGOING');
+  });
+  it('Repaying for a user after maturity after late repay threshold should suceed', async function () {
+    const borrowAmount = depositAmount;
+    await positionManager.BorrowerPools.deposit(
+      depositRate,
+      poolHash,
+      poolToken,
+      positionManager.address,
+      depositAmount
+    );
+    await borrower.BorrowerPools.borrow(borrower.address, borrowAmount);
+
+    await checkPoolState(poolHash, {
+      normalizedAvailableDeposits: BigNumber.from(0),
+      lowerInterestRate: depositRate,
+      normalizedBorrowedAmount: borrowAmount,
+    });
+    await checkTickAmounts(poolHash, depositRate, {
+      adjustedTotalAmount: depositAmount.div(2),
+      adjustedRemainingAmount: BigNumber.from(0),
+      normalizedUsedAmount: depositAmount,
+      adjustedPendingDepositAmount: BigNumber.from(0),
+    });
+
+    const expectedBondsQuantity = await computeBondsQuantity(
+      depositAmount,
+      depositRate,
+      loanDuration
+    );
+    await ethers.provider.send('evm_increaseTime', [
+      loanDuration.toNumber() + repaymentPeriod.toNumber() + oneSec,
+    ]);
+    await ethers.provider.send('evm_mine', []);
+    const currentMaturity = (await BorrowerPools.getPoolState(poolHash))
+      .currentMaturity;
+    await expect(liquidator.BorrowerPools.repayFor(borrower.address)).to.emit(
+      borrower.BorrowerPools,
+      'LateRepay'
+    );
+
+    const realizedExpectedBondsQuantity = await calcRealizedBondsQuantity(
+      currentMaturity,
+      expectedBondsQuantity,
+      depositRate
+    );
+
+    await checkPoolState(poolHash, {
+      normalizedAvailableDeposits: realizedExpectedBondsQuantity,
+      lowerInterestRate: depositRate,
+      normalizedBorrowedAmount: BigNumber.from(0),
+    });
+    await checkTickAmounts(poolHash, depositRate, {
+      adjustedTotalAmount: depositAmount.div(2),
+      adjustedRemainingAmount: depositAmount.div(2),
+      normalizedUsedAmount: BigNumber.from(0),
+      adjustedPendingDepositAmount: BigNumber.from(0),
+    });
   });
   it('Repaying after maturity but before late repay threshold should update all the ticks data accordingly', async function () {
     const borrowAmount = depositAmount;
@@ -903,9 +1050,10 @@ describe('Borrower Pools - Repay', function () {
       }
     );
 
-    await mockLendingPool.mock.getReserveNormalizedIncome.returns(
-      TEST_RETURN_YIELD_PROVIDER_LR_RAY.mul(2)
-    );
+    // await mockLendingPool.mock.getReserveNormalizedIncome.returns(
+    //   TEST_RETURN_YIELD_PROVIDER_LR_RAY.mul(2)
+    // );
+    await mockDeployer.LendingPool.updateMultiplier(4);
     await ethers.provider.send('evm_increaseTime', [loanDuration.toNumber()]);
     await ethers.provider.send('evm_mine', []);
     const currentMaturity = (await BorrowerPools.getPoolState(poolHash))

@@ -15,6 +15,8 @@ import "./lib/Uint128WadRayMath.sol";
 
 import "./PoolsController.sol";
 
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+
 contract BorrowerPools is PoolsController, IBorrowerPools {
   using PoolLogic for Types.Pool;
   using Scaling for uint128;
@@ -73,7 +75,8 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       uint128 bondsQuantity,
       uint128 adjustedPendingAmount,
       uint128 atlendisLiquidityRatio,
-      uint128 accruedFees
+      uint128 accruedFees,
+      uint128 lastFeeDistributionTimestamp
     )
   {
     Types.Tick storage tick = pools[poolHash].ticks[rate];
@@ -83,24 +86,9 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       tick.bondsQuantity,
       tick.adjustedPendingAmount,
       tick.atlendisLiquidityRatio,
-      tick.accruedFees
+      tick.accruedFees,
+      tick.lastFeeDistributionTimestamp
     );
-  }
-
-  /**
-   * @notice Returns the timestamp of the last fee distribution to the tick
-   * @param pool The identifier of the pool pool
-   * @param rate The tick rate from which to get data
-   * @return lastFeeDistributionTimestamp Timestamp of the last fee's distribution to the tick
-   **/
-  function getTickLastUpdate(string calldata pool, uint128 rate)
-    public
-    view
-    override
-    returns (uint128 lastFeeDistributionTimestamp)
-  {
-    Types.Tick storage tick = pools[keccak256(abi.encode(pool))].ticks[rate];
-    return tick.lastFeeDistributionTimestamp;
   }
 
   /**
@@ -471,7 +459,11 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
    * @param loanAmount The total amount of the loan
    **/
   function borrow(address to, uint128 loanAmount) external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
-    bytes32 poolHash = borrowerAuthorizedPools[_msgSender()];
+    // this is to fix the use case of calling from the treasury
+    address borrower = _msgSender();
+    if (hasRole(Roles.TREASURY_ROLE, _msgSender())) borrower = to;
+
+    bytes32 poolHash = borrowerAuthorizedPools[borrower];
     Types.Pool storage pool = pools[poolHash];
     if (pool.state.closed) {
       revert Errors.BP_POOL_CLOSED();
@@ -484,6 +476,8 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     }
 
     uint128 normalizedLoanAmount = loanAmount.scaleToWad(pool.parameters.TOKEN_DECIMALS);
+    uint128 normalizedCollateralAmount = (10000 * loanAmount.scaleToWad(pool.parameters.COLLATERAL_TOKEN_DECIMALS)) /
+      pool.parameters.LTV;
     uint128 normalizedEstablishmentFee = normalizedLoanAmount.wadMul(pool.parameters.ESTABLISHMENT_FEE_RATE);
     uint128 normalizedBorrowedAmount = normalizedLoanAmount - normalizedEstablishmentFee;
     if (pool.state.normalizedBorrowedAmount + normalizedLoanAmount > pool.parameters.MAX_BORROWABLE_AMOUNT) {
@@ -523,6 +517,8 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
 
     protocolFees[poolHash] += normalizedEstablishmentFee;
     pool.state.normalizedBorrowedAmount += normalizedLoanAmount;
+    // deposit collateral
+    pool.depositCollateralToYieldProvider(borrower, normalizedCollateralAmount);
     pool.parameters.YIELD_PROVIDER.withdraw(
       pool.parameters.UNDERLYING_TOKEN,
       normalizedBorrowedAmount.scaleFromWad(pool.parameters.TOKEN_DECIMALS),
@@ -534,7 +530,14 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
    * @notice Repays a currently outstanding bonds of the given pool.
    **/
   function repay() external override whenNotPaused onlyRole(Roles.BORROWER_ROLE) {
-    bytes32 poolHash = borrowerAuthorizedPools[_msgSender()];
+    repayFor(_msgSender());
+  }
+
+  /**
+   * @notice Repays a currently outstanding bonds of the given pool for a borrower (liquidation)
+   **/
+  function repayFor(address borrower) public whenNotPaused {
+    bytes32 poolHash = borrowerAuthorizedPools[borrower];
     Types.Pool storage pool = pools[poolHash];
     if (pool.state.defaulted) {
       revert Errors.BP_POOL_DEFAULTED();
@@ -542,9 +545,17 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
     if (pool.state.currentMaturity == 0) {
       revert Errors.BP_REPAY_NO_ACTIVE_LOAN();
     }
+
+    if (kycId != address(0) && IERC721(kycId).balanceOf(msg.sender) == 0) revert Errors.NOT_KYCED();
+
     bool earlyRepay = pool.state.currentMaturity > block.timestamp;
     if (earlyRepay && !pool.parameters.EARLY_REPAY) {
       revert Errors.BP_EARLY_REPAY_NOT_ACTIVATED();
+    }
+
+    if (borrower != _msgSender() && block.timestamp < (pool.state.currentMaturity + pool.parameters.REPAYMENT_PERIOD)) {
+      // liquidator cannot liquidate early or during repayment period
+      revert Errors.BP_LOAN_ONGOING();
     }
 
     // collectFees should be called before changing pool global state as fee collection depends on it
@@ -570,10 +581,15 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       bondsIssuanceIndexAlreadyIncremented = indexIncremented || bondsIssuanceIndexAlreadyIncremented;
     }
 
+    uint128 normalizedCollateralAmount = (10000 *
+      (pool.state.normalizedBorrowedAmount.scaleFromWad(pool.parameters.TOKEN_DECIMALS)).scaleToWad(
+        pool.parameters.COLLATERAL_TOKEN_DECIMALS
+      )) / pool.parameters.LTV;
     uint128 repaymentFees = pool.getRepaymentFees(normalizedRepayAmount);
     normalizedRepayAmount += repaymentFees;
 
     pool.depositToYieldProvider(_msgSender(), normalizedRepayAmount);
+    pool.parameters.YIELD_PROVIDER.withdraw(pool.parameters.COLLATERAL_TOKEN, normalizedCollateralAmount, borrower);
     pool.state.nextLoanMinStart = uint128(block.timestamp) + pool.parameters.COOLDOWN_PERIOD;
 
     pool.state.bondsIssuedQuantity = 0;
@@ -630,10 +646,10 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
       pool.parameters.LIQUIDITY_REWARDS_ACTIVATION_THRESHOLD
     ) {
       pool.state.active = true;
-      emit PoolActivated(pool.parameters.POOL_HASH);
+      // emit PoolActivated(pool.parameters.POOL_HASH);
     }
 
-    emit TopUpLiquidityRewards(borrowerAuthorizedPools[_msgSender()], normalizedAmount);
+    // emit TopUpLiquidityRewards(borrowerAuthorizedPools[_msgSender()], normalizedAmount);
   }
 
   // PUBLIC METHODS
@@ -641,19 +657,14 @@ contract BorrowerPools is PoolsController, IBorrowerPools {
   /**
    * @notice Collect yield provider fees as well as liquidity rewards for the target tick
    * @param poolHash The identifier of the pool
+   * @param rate The rate is target tick, rate = 0 means collect entire fees
    **/
-  function collectFeesForTick(bytes32 poolHash, uint128 rate) external override whenNotPaused {
+  function collectFees(bytes32 poolHash, uint128 rate) external override whenNotPaused {
     Types.Pool storage pool = pools[poolHash];
-    pool.collectFees(rate);
-  }
-
-  /**
-   * @notice Collect yield provider fees as well as liquidity rewards for the whole pool
-   * Iterates over all pool initialized ticks
-   * @param poolHash The identifier of the pool
-   **/
-  function collectFees(bytes32 poolHash) external override whenNotPaused {
-    Types.Pool storage pool = pools[poolHash];
-    pool.collectFees();
+    if (rate == 0) {
+      pool.collectFees();
+    } else {
+      pool.collectFees(rate);
+    }
   }
 }
