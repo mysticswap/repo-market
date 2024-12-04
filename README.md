@@ -24,6 +24,9 @@ The repository is structured as follows :
 │   ├── BorrowerPools.sol                 <- Borrower Pools - entry point for borrowers
 │   ├── PoolsController.sol               <- Governance layer over pool storage, handles pool roles
 │   ├── PositionManager.sol               <- PositionManager - entrypoint for lenders
+│   ├── Treasury.sol                      <- Treasury - controller for custodying rwa assets in an external custodian like Bitgot and Anchorage
+│   ├── PoolWrapper.sol                   <- PoolWrapper - contract to replace the aave pools as pool would not be required in our use case
+│   ├── KYCId.sol                         <- KYCId - kyc nft minted after a user is kyc'ed
 │   └── PositionDescriptor.sol            <- PositionDescriptor - lender position nft artwork renderer
 ├── deploy                                <- Deployment scripts
 ├── test                                  <- Smart contract tests
